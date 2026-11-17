@@ -25,7 +25,8 @@ export function SyncScreen() {
   const s = useStore();
   const nav = useNav();
   const st = s.settings;
-  const [f, setF] = useState({ ghOwner: st.ghOwner, ghRepo: st.ghRepo, ghToken: st.ghToken, ghPath: st.ghPath || 'ledger.json' });
+  // Prefilled with the family's data repo, so on a phone only the token has to be pasted.
+  const [f, setF] = useState({ ghOwner: st.ghOwner || 'chepkov-created', ghRepo: st.ghRepo || 'duet-data', ghToken: st.ghToken, ghPath: st.ghPath || 'ledger.json' });
   const [check, setCheck] = useState(null);
   const set = (k) => (e) => setF({ ...f, [k]: e.currentTarget.value.trim() });
   const save = async () => {
