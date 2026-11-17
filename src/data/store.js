@@ -12,7 +12,8 @@ export const PEOPLE = ['Миша', 'Арина'];
 const A = (id, name, kind, owner, color, currency = 'RUB', group) => ({ id, name, kind, owner, color, currency, group, initial: 0, updatedAt: 0 });
 export const DEFAULT_ACCOUNTS = [
   A('misha-cash', 'Наличные', 'cash', 'Миша', 'var(--acc-red)'),
-  A('misha-psb', 'ПСБ', 'bank', 'Миша', 'var(--acc-psb)'),
+  A('misha-psb', 'ПСБ Твой Банк', 'bank', 'Миша', 'var(--acc-psb)'),
+  A('misha-psb2', 'ПСБ Зарплатная', 'bank', 'Миша', 'var(--acc-psb)'),
   A('misha-sber', 'Сбер', 'bank', 'Миша', 'var(--acc-sber)'),
   A('misha-tbank', 'Т-Банк', 'bank', 'Миша', 'var(--acc-tbank)'),
   A('misha-ozon', 'Озон', 'bank', 'Миша', 'var(--acc-ozon)'),
