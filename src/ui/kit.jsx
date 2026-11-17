@@ -27,8 +27,24 @@ export function Screen({ title, back, onBack, left, right, pushed, children, noL
     el.addEventListener('scroll', on, { passive: true });
     return () => el.removeEventListener('scroll', on);
   }, [pushed]);
+  // Swipe from the left edge closes the screen, like iOS. The screen follows the finger.
+  const drag = useRef(null);
+  const onTS = (e) => { if (!pushed || !onBack) return; const t = e.touches[0]; if (t.clientX < 28) drag.current = { x: t.clientX, y: t.clientY, dx: 0, on: false }; };
+  const onTM = (e) => {
+    const d = drag.current; if (!d) return;
+    const t = e.touches[0]; d.dx = t.clientX - d.x;
+    if (!d.on && Math.abs(t.clientY - d.y) > 30 && Math.abs(t.clientY - d.y) > d.dx) { drag.current = null; ref.current.style.transform = ''; return; }
+    if (d.dx > 8) { d.on = true; ref.current.style.transition = 'none'; ref.current.style.transform = `translateX(${Math.max(0, d.dx)}px)`; }
+  };
+  const onTE = () => {
+    const d = drag.current; drag.current = null; if (!d || !ref.current) return;
+    const el = ref.current;
+    el.style.transition = 'transform 0.18s ease-out';
+    if (d.on && d.dx > Math.min(110, window.innerWidth * 0.3)) { el.style.transform = 'translateX(100%)'; setTimeout(onBack, 160); }
+    else el.style.transform = '';
+  };
   return (
-    <div class={`screen${pushed ? ' pushed' : ''}`} ref={ref}>
+    <div class={`screen${pushed ? ' pushed' : ''}`} ref={ref} onTouchStart={onTS} onTouchMove={onTM} onTouchEnd={onTE} onTouchCancel={onTE}>
       <header class={`nav${scrolled || noLarge ? ' scrolled' : ''}`}>
         <div class="nav-bar">
           <div class="slot">
@@ -110,6 +126,40 @@ export function CatIcon({ catId, owner, size }) {
       {c.icon}
       {owner && <span class="who-dot" style={{ background: PERSON_COLOR[owner] || 'var(--surface-3)' }}>{owner[0]}</span>}
     </span>
+  );
+}
+
+/** Row you can drag to the left to reveal «Удалить» (like Telegram). onDelete is asked to confirm. */
+export function SwipeRow({ children, onDelete }) {
+  const ref = useRef(null);
+  const st = useRef(null);
+  const [open, setOpen] = useState(false);
+  const W = 88;
+  const set = (x, anim) => { const el = ref.current; if (!el) return; el.style.transition = anim ? 'transform 0.18s ease-out' : 'none'; el.style.transform = x ? `translateX(${x}px)` : ''; };
+  const ts = (e) => { const t = e.touches[0]; if (t.clientX < 28) return; st.current = { x: t.clientX, y: t.clientY, base: open ? -W : 0, dx: 0, h: null }; };
+  const tm = (e) => {
+    const s = st.current; if (!s) return;
+    const t = e.touches[0]; const dx = t.clientX - s.x, dy = t.clientY - s.y;
+    if (s.h === null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) s.h = Math.abs(dx) > Math.abs(dy);
+    if (!s.h) return;
+    e.stopPropagation(); s.dx = dx;
+    set(Math.min(0, Math.max(-W * 1.4, s.base + dx)), false);
+  };
+  const te = () => {
+    const s = st.current; st.current = null; if (!s || !s.h) return;
+    const x = s.base + s.dx;
+    const willOpen = x < -W / 2;
+    setOpen(willOpen); set(willOpen ? -W : 0, true);
+  };
+  const close = () => { setOpen(false); set(0, true); };
+  return (
+    <div class="swipe-row">
+      <button class="swipe-del" onClick={() => { close(); onDelete(); }} tabIndex={open ? 0 : -1}>Удалить</button>
+      <div ref={ref} class="swipe-front" onTouchStart={ts} onTouchMove={tm} onTouchEnd={te} onTouchCancel={te}
+        onClickCapture={(e) => { if (open) { e.stopPropagation(); e.preventDefault(); close(); } }}>
+        {children}
+      </div>
+    </div>
   );
 }
 

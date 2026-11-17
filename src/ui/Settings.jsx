@@ -6,6 +6,7 @@ import { Accounts } from './Accounts.jsx';
 import { Categories } from './Categories.jsx';
 import { checkAccess } from '../data/github.js';
 import { PushSettings } from './Push.jsx';
+import { ShakeSettings } from './Shake.jsx';
 
 export function Onboarding() {
   return (
@@ -129,6 +130,8 @@ export function Settings() {
       </div>
 
       <PushSettings />
+
+      <ShakeSettings />
 
       <div class="group-label">Данные</div>
       <div class="list inset plain">

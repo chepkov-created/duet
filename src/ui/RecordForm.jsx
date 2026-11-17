@@ -1,7 +1,7 @@
 import { useState } from 'preact/hooks';
 import { useNav } from './App.jsx';
 import { Sheet, Segmented, Row, CatIcon, PERSON_COLOR } from './kit.jsx';
-import { useStore, alive, upsert, remove, updateSettings, otherPerson, PEOPLE, CURRENCIES } from '../data/store.js';
+import { useStore, alive, upsert, remove, undoDelete, updateSettings, otherPerson, PEOPLE, CURRENCIES } from '../data/store.js';
 import { accountSections, accLabel } from './Accounts.jsx';
 import { TemplatePicker } from './Templates.jsx';
 import { category, allowsItems, EXPENSE_GROUPS, INCOME_GROUPS, NATURES, natureOf } from '../data/categories.js';
@@ -101,7 +101,7 @@ export function RecordForm({ record, defaults, template }) {
   };
   const del = () => {
     if (tplObj) { if (confirm('Удалить шаблон?')) { remove('templates', tplObj.id); nav.closeSheet(); } return; }
-    if (confirm('Удалить запись?')) { remove('records', record.id); nav.closeSheet(); }
+    if (confirm('Удалить запись?')) { remove('records', record.id); nav.closeSheet(); nav.toast('Запись удалена', () => undoDelete()); }
   };
 
   const c = f.categoryId ? category(f.categoryId) : null;

@@ -10,6 +10,7 @@ import { RecordForm } from './RecordForm.jsx';
 import { Scan } from './Scan.jsx';
 import { Onboarding } from './Settings.jsx';
 import { duePayments } from './Payments.jsx';
+import { ShakeListener } from './Shake.jsx';
 
 const Nav = createContext(null);
 export const useNav = () => useContext(Nav);
@@ -70,6 +71,7 @@ export function App() {
           <TabBtn id="more" cur={tab} set={nav.tab} label="Ещё" Icon={Svg.more} />
         </nav>
       )}
+      <ShakeListener toast={nav.toast} />
       {sheet && <sheet.C {...sheet.props} />}
       {toast && (
         <div class="toast" role="status">

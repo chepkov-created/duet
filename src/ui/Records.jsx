@@ -1,13 +1,23 @@
 import { useState } from 'preact/hooks';
 import { useNav } from './App.jsx';
-import { Screen, RecordRow, Empty } from './kit.jsx';
-import { useStore, alive, visibleRecords, inRub, hiddenFromMe } from '../data/store.js';
+import { Screen, RecordRow, Empty, SwipeRow } from './kit.jsx';
+import { useStore, alive, visibleRecords, inRub, hiddenFromMe, remove, undoDelete } from '../data/store.js';
 import { category, groupOf, natureOfRecord, NATURE_NAME } from '../data/categories.js';
 import { dayLabel, fmt, dayStart } from '../data/format.js';
 import { effectOn, accountBalance } from '../data/store.js';
 import { AdjustBalance, AccountForm } from './Accounts.jsx';
 import { PersonSwitch } from './Overview.jsx';
 import { FilterBar, FilterButton } from './Filter.jsx';
+
+/** Delete with a confirmation; the toast and a shake can bring it back. */
+export function deleteRecord(nav, r) {
+  const c = category(r.categoryId);
+  const what = `${r.type === 'transfer' ? 'Перевод' : c.name}${r.note ? ` («${r.note.slice(0, 30)}»)` : ''} на ${fmt(r.orig ? r.orig.amount : r.amount, r.orig?.currency)}`;
+  if (!confirm(`Удалить запись?
+${what}`)) return;
+  remove('records', r.id);
+  nav.toast('Запись удалена', () => undoDelete());
+}
 
 const norm = (s) => String(s || '').toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ').trim();
 const TYPE_WORDS = { expense: 'расход трата', income: 'доход поступление', transfer: 'перевод' };
@@ -95,7 +105,7 @@ export function Records({ accountId, categoryIds, title = 'Записи', range,
           <section key={d.key}>
             <div class="day-head"><span>{dayLabel(d.items[0].date)}</span><span class="num">{fmt(sum, singleAcc?.currency)}</span></div>
             <div class="day-list">
-              {d.items.map((r) => <RecordRow key={r.id} r={r} accounts={accounts} onClick={() => nav.record(r)} />)}
+              {d.items.map((r) => <SwipeRow key={r.id} onDelete={() => deleteRecord(nav, r)}><RecordRow r={r} accounts={accounts} onClick={() => nav.record(r)} /></SwipeRow>)}
             </div>
           </section>
         );

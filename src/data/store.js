@@ -134,8 +134,23 @@ export function upsertMany(collection, items) {
   commit({ ...state.ledger, [collection]: [...map.values()] });
 }
 
+// What was deleted on this phone, newest last: shake or "Отменить" brings it back.
+const UNDO_KEY = 'duet.undo';
+const undoStack = (() => { try { return JSON.parse(localStorage.getItem(UNDO_KEY) || '[]'); } catch { return []; } })();
+const saveUndo = () => persist(UNDO_KEY, undoStack.slice(-30));
+export const lastDeleted = () => undoStack[undoStack.length - 1] || null;
+export function undoDelete() {
+  const d = undoStack.pop();
+  if (!d) return null;
+  saveUndo();
+  upsert(d.collection, { ...d.item, deleted: undefined });
+  return d;
+}
+
 export function remove(collection, id) {
   const now = Date.now();
+  const before = state.ledger[collection].find((x) => x.id === id);
+  if (before && !before.deleted) { undoStack.push({ collection, item: before, at: now }); if (undoStack.length > 30) undoStack.shift(); saveUndo(); }
   // Tombstone, so the deletion reaches the other phone through sync.
   const copy = state.ledger[collection].map((x) => (x.id === id ? { id, deleted: true, updatedAt: now } : x));
   commit({ ...state.ledger, [collection]: copy });

@@ -1,12 +1,12 @@
 import { useState } from 'preact/hooks';
 import { useNav } from './App.jsx';
-import { Screen, Card, Menu, RecordRow, Segmented, Empty, Svg, PERSON_COLOR } from './kit.jsx';
+import { Screen, Card, Menu, RecordRow, SwipeRow, Segmented, Empty, Svg, PERSON_COLOR } from './kit.jsx';
 import { Donut, Area, Bar } from './charts.jsx';
 import { useStore, alive, visibleRecords, visibleAccounts, accountBalance, updateSettings, toRub, PEOPLE } from '../data/store.js';
 import { periodRange, totals, byCategory, byOwner, balanceSeries } from '../data/periods.js';
 import { GROUPS, group, category } from '../data/categories.js';
 import { rub, fmt, plural } from '../data/format.js';
-import { Records } from './Records.jsx';
+import { Records, deleteRecord } from './Records.jsx';
 import { Reports } from './Reports.jsx';
 import { Scheduled, Budgets, budgetSpent } from './Planning.jsx';
 import { AccountForm, AddAccount, Accounts, AccountFolder, accountSections, accLabel, ACC_ICON } from './Accounts.jsx';
@@ -87,7 +87,7 @@ export function Overview() {
             <Empty icon="🧾" text="Записей пока нет"><button class="link strong" onClick={() => nav.record(null)}>Добавить первую</button></Empty>
           ) : (
             [...recs].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5).map((r) => (
-              <RecordRow key={r.id} r={r} accounts={accounts} onClick={() => nav.record(r)} />
+              <SwipeRow key={r.id} onDelete={() => deleteRecord(nav, r)}><RecordRow r={r} accounts={accounts} onClick={() => nav.record(r)} /></SwipeRow>
             ))
           )}
         </Card>
