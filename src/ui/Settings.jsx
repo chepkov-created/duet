@@ -30,6 +30,8 @@ export function SyncScreen() {
   const [check, setCheck] = useState(null);
   const set = (k) => (e) => setF({ ...f, [k]: e.currentTarget.value.trim() });
   const save = async () => {
+    const missing = [['ghOwner', 'Владелец'], ['ghRepo', 'Репозиторий'], ['ghToken', 'Токен']].filter(([k]) => !f[k]).map(([, l]) => `«${l}»`);
+    if (missing.length) { setCheck({ err: `Заполните: ${missing.join(', ')}` }); return; }
     setCheck({ busy: true });
     try {
       const info = await checkAccess({ owner: f.ghOwner, repo: f.ghRepo, token: f.ghToken });
@@ -56,13 +58,13 @@ export function SyncScreen() {
 
       <div class="group-label">Репозиторий GitHub</div>
       <div class="list inset plain">
-        <label class="row"><span class="rl">Владелец</span><input value={f.ghOwner} onInput={set('ghOwner')} placeholder="логин на GitHub" autoCapitalize="off" autoCorrect="off" /></label>
-        <label class="row"><span class="rl">Репозиторий</span><input value={f.ghRepo} onInput={set('ghRepo')} placeholder="duet-data" autoCapitalize="off" autoCorrect="off" /></label>
-        <label class="row"><span class="rl">Файл</span><input value={f.ghPath} onInput={set('ghPath')} placeholder="ledger.json" autoCapitalize="off" /></label>
-        <label class="row"><span class="rl">Токен</span><input type="password" value={f.ghToken} onInput={set('ghToken')} placeholder="github_pat_…" autoComplete="off" /></label>
+        <label class="row"><span class="rl">Владелец</span><input value={f.ghOwner} onInput={set('ghOwner')} placeholder="не заполнено" autoCapitalize="off" autoCorrect="off" /></label>
+        <label class="row"><span class="rl">Репозиторий</span><input value={f.ghRepo} onInput={set('ghRepo')} placeholder="не заполнено" autoCapitalize="off" autoCorrect="off" /></label>
+        <label class="row"><span class="rl">Файл</span><input value={f.ghPath} onInput={set('ghPath')} placeholder="не заполнено" autoCapitalize="off" /></label>
+        <label class="row"><span class="rl">Токен</span><input type="password" value={f.ghToken} onInput={set('ghToken')} onChange={set('ghToken')} placeholder="вставьте токен" autoComplete="off" /></label>
       </div>
       <div style={{ padding: 'var(--s4)', display: 'grid', gap: 'var(--s2)' }}>
-        <button class="btn primary" disabled={check?.busy || !f.ghOwner || !f.ghRepo || !f.ghToken} onClick={save}>{check?.busy ? 'Проверяю…' : 'Проверить и подключить'}</button>
+        <button class="btn primary" disabled={check?.busy} onClick={save}>{check?.busy ? 'Проверяю…' : 'Проверить и подключить'}</button>
         {syncConfigured(st) && <button class="btn danger" onClick={off}>Отключить на этом телефоне</button>}
       </div>
       {check?.ok && <div class="note-box" style={{ color: 'var(--pos-text)' }}>✓ {check.ok}</div>}
