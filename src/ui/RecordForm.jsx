@@ -6,6 +6,36 @@ import { accountSections, accLabel } from './Accounts.jsx';
 import { TemplatePicker } from './Templates.jsx';
 import { category, allowsItems, EXPENSE_GROUPS, INCOME_GROUPS, NATURES, natureOf } from '../data/categories.js';
 
+/** "2400000,5" -> "2 400 000,5" (narrow no-break spaces between thousands). */
+export const groupDigits = (raw) => {
+  const s = String(raw || '').replace(/[^\d.,]/g, '').replace('.', ',');
+  const [int, ...rest] = s.split(',');
+  const g = int.replace(/^0+(?=\d)/, '').replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  return rest.length ? `${g},${rest.join('').slice(0, 2)}` : g;
+};
+
+/** Amount field: groups thousands while typing, keeps the caret in place, shrinks long numbers to fit. */
+function AmountInput({ value, onChange, cls, big, placeholder, autoFocus }) {
+  const shown = groupDigits(value);
+  const digits = shown.replace(/\D/g, '').length;
+  const base = big ? 64 : 40;
+  const size = Math.max(big ? 26 : 20, base - Math.max(0, digits - (big ? 6 : 7)) * (big ? 5.5 : 3.5));
+  const onInput = (e) => {
+    const el = e.currentTarget;
+    const caret = el.selectionStart ?? el.value.length;
+    const before = el.value.slice(0, caret).replace(/[^\d.,]/g, '').length; // digits left of the caret
+    const raw = el.value.replace(/[^\d.,]/g, '').replace('.', ',');
+    onChange(raw);
+    const next = groupDigits(raw);
+    requestAnimationFrame(() => {
+      let pos = 0, seen = 0;
+      while (pos < next.length && seen < before) { if (/[\d,]/.test(next[pos])) seen++; pos++; }
+      try { el.setSelectionRange(pos, pos); } catch { /* not focused */ }
+    });
+  };
+  return <input class={`amount-input num ${cls}`} style={{ fontSize: size }} inputMode="decimal" placeholder={placeholder} autoFocus={autoFocus} value={shown} onInput={onInput} />;
+}
+
 /** Receipt breakdown: name × qty = line sum. Shown only for categories where it makes sense. */
 function ItemsBlock({ items, total, onChange, onUseSum, onPickCat }) {
   const num = (t) => Number(String(t || '').replace(/\s/g, '').replace(',', '.')) || 0;
@@ -171,15 +201,14 @@ export function RecordForm({ record, defaults, template }) {
       <label class="amount-box">
         <span class="cur">{fromCur}</span>
         <span class="sr-only">Сумма</span>
-        <input class={`amount-input num ${f.type}`} inputMode="decimal" placeholder={isTpl ? 'любая' : f.type === 'expense' ? '-0' : '0'} autoFocus={!record && !isTpl}
-          value={f.amountText} onInput={(e) => { upd({ amountText: e.currentTarget.value.replace(/[^\d.,]/g, '') }); setError(''); }} />
+        <AmountInput cls={f.type} big placeholder={isTpl ? 'любая' : f.type === 'expense' ? '-0' : '0'} autoFocus={!record && !isTpl}
+          value={f.amountText} onChange={(v) => { upd({ amountText: v }); setError(''); }} />
       </label>
       {exchange && (
         <label class="amount-box" style={{ borderTop: '1px solid var(--line)' }}>
           <span class="cur">{toCur}</span>
           <span class="muted">пришло</span>
-          <input class="amount-input num transfer" style={{ fontSize: 40 }} inputMode="decimal" placeholder="0"
-            value={f.toAmountText} onInput={(e) => { upd({ toAmountText: e.currentTarget.value.replace(/[^\d.,]/g, '') }); setError(''); }} />
+          <AmountInput cls="transfer" placeholder="0" value={f.toAmountText} onChange={(v) => { upd({ toAmountText: v }); setError(''); }} />
         </label>
       )}
       {exchange && amount > 0 && num(f.toAmountText) > 0 && (
@@ -221,10 +250,10 @@ export function RecordForm({ record, defaults, template }) {
           const def = natureOf(f.categoryId);
           const cur = f.nature || def;
           return (
-            <div class="row" style={{ flexWrap: 'wrap' }}>
+            <div class="row" style={{ flexWrap: 'wrap', rowGap: 8 }}>
               <span class="ri" aria-hidden="true">🎯</span>
-              <span class="rl">Характер{!f.nature && <span class="muted" style={{ display: 'block', fontSize: 'var(--fs-xs)' }}>как у категории</span>}</span>
-              <div class="who">
+              <span class="rl">Характер{!f.nature && <span class="muted"> · как у категории</span>}</span>
+              <div class="who" style={{ marginLeft: 42, width: 'calc(100% - 42px)', display: 'flex' }}>
                 {NATURES.map(([k, n, c]) => (
                   <button key={k} class={cur === k ? 'on' : ''} onClick={() => upd({ nature: k === def ? undefined : k })}><span style={{ color: c }}>●</span> {n}</button>
                 ))}
