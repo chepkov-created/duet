@@ -64,6 +64,20 @@ const BASE = [
   },
 ];
 
+// "Характер расходов": every expense category is Я должен / Мне нужно / Хочу; editable per category.
+export const NATURES = [['must', 'Я должен', 'var(--neg)'], ['need', 'Мне нужно', 'var(--warn)'], ['want', 'Хочу', 'var(--pos)']];
+export const NATURE_NAME = Object.fromEntries(NATURES.map(([k, n]) => [k, n]));
+export const NATURE_COLOR = Object.fromEntries(NATURES.map(([k, , c]) => [k, c]));
+const NATURE_GROUP = { food: 'must', home: 'must', fin: 'must', car: 'must', shop: 'need', trans: 'need', tech: 'need', inv: 'need', life: 'want', other: 'want' };
+const NATURE_CAT = {
+  'food.2': 'want', 'food.3': 'want',
+  'shop.1': 'need', 'shop.2': 'want', 'shop.3': 'want', 'shop.8': 'want', 'shop.11': 'must',
+  'car.2': 'need', 'car.3': 'need', 'car.4': 'need',
+  'trans.1': 'must',
+  'life.1': 'must', 'life.7': 'need', 'life.12': 'need',
+  'tech.1': 'must', 'tech.2': 'must', 'tech.3': 'need',
+};
+
 // Groups where a receipt breakdown ("Позиции чека") makes sense; switchable per group in the categories editor.
 const ITEMS_BY_DEFAULT = new Set(['food', 'shop', 'home', 'car', 'tech']);
 
@@ -103,6 +117,7 @@ export function applyCategoryEdits(edits = []) {
     for (const c of g.cats) {
       const ce = ed[c.id];
       if (ce) Object.assign(c, ce.name ? { name: ce.name } : {}, { hidden: Boolean(ce.hidden) });
+      if (g.type === 'expense') c.nature = (ce && ce.nature) || NATURE_CAT[c.id] || (ge && ge.nature) || NATURE_GROUP[g.id] || 'need';
       // the "general" sub follows the group name unless renamed on its own
       if (c.id === `${g.id}.0` && !(ce && ce.name) && ge && ge.name) c.name = ge.name;
     }
@@ -124,4 +139,9 @@ export const groupOf = (catId) => groupById[category(catId).group];
 export const allowsItems = (catId) => Boolean(catId && groupOf(catId)?.items);
 
 /** Balance corrections are not spending or income. */
+/** Nature of a category (expenses only), or null. */
+export const natureOf = (catId) => (catId ? category(catId).nature || null : null);
+/** Nature of a record: its own choice, else its category's. */
+export const natureOfRecord = (r) => (r.type !== 'expense' ? null : r.nature || natureOf(r.categoryId));
+
 export const isAdjustment = (catId) => typeof catId === 'string' && catId.startsWith('adj.');

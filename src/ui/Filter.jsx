@@ -1,7 +1,7 @@
 import { useState } from 'preact/hooks';
 import { Sheet, CatIcon, Segmented, PERSON_COLOR } from './kit.jsx';
 import { useStore, alive, updateSettings, filterCount, allLabels, EMPTY_FILTER, PEOPLE } from '../data/store.js';
-import { GROUPS, category, group } from '../data/categories.js';
+import { GROUPS, category, group, NATURES, NATURE_NAME } from '../data/categories.js';
 import { accLabel, accountSections } from './Accounts.jsx';
 
 const toggle = (list, v) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
@@ -30,6 +30,7 @@ export function FilterBar() {
   const accounts = alive(s.ledger.accounts);
   const chips = [
     ...(f.type && f.type !== 'all' ? [['type', f.type, f.type === 'income' ? 'Только доходы' : 'Только расходы']] : []),
+    ...(f.natures || []).map((k) => ['natures', k, NATURE_NAME[k]]),
     ...f.accounts.map((id) => ['accounts', id, accLabel(accounts.find((a) => a.id === id))]),
     ...f.cats.map((id) => ['cats', id, id.includes('.') ? category(id).name : group(id)?.name]),
     ...f.labels.map((l) => ['labels', l, `#${l}`]),
@@ -62,7 +63,7 @@ export function FilterSheet({ onClose, section = 'all' }) {
   const groups = GROUPS.filter((g) => type === 'all' || g.type === type);
   const reset = () => {
     if (section === 'accounts') setF({ ...f, accounts: [] });
-    else if (section === 'cats') setF({ ...f, cats: [], labels: [], type: 'all' });
+    else if (section === 'cats') setF({ ...f, cats: [], labels: [], type: 'all', natures: [] });
     else { setF(EMPTY_FILTER); setView('all'); }
   };
 
@@ -107,6 +108,15 @@ export function FilterSheet({ onClose, section = 'all' }) {
         <Segmented options={[['all', 'Всё'], ['expense', 'Только расходы'], ['income', 'Только доходы']]} value={type}
           onChange={(t) => setF({ ...f, type: t, cats: f.cats.filter((c) => t === 'all' || (group(c.split('.')[0])?.type === t)) })} />
       </div>
+      {type !== 'income' && <>
+        <div class="group-label">Характер расходов</div>
+        <div style={{ padding: '0 var(--s4)' }}>
+          {NATURES.map(([k, n, c]) => {
+            const on = (f.natures || []).includes(k);
+            return <button key={k} class={`label-chip${on ? ' on' : ''}`} style={on ? { background: c } : {}} onClick={() => setF({ ...f, natures: toggle(f.natures || [], k) })}>{n}</button>;
+          })}
+        </div>
+      </>}
       <div class="group-label">Категории {f.cats.length ? `· ${f.cats.length}` : '· все'}</div>
       <div class="list">
         {groups.map((g) => {

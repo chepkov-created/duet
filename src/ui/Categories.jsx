@@ -2,7 +2,8 @@ import { useState } from 'preact/hooks';
 import { useNav } from './App.jsx';
 import { Screen, Segmented, CatIcon } from './kit.jsx';
 import { useStore, upsert, getState } from '../data/store.js';
-import { ALL_GROUPS, BASE_CATEGORY_IDS } from '../data/categories.js';
+import { ALL_GROUPS, BASE_CATEGORY_IDS, NATURES, NATURE_NAME, NATURE_COLOR } from '../data/categories.js';
+const NEXT = { must: 'need', need: 'want', want: 'must' };
 import { uid } from '../data/format.js';
 
 const PALETTE = ['var(--cat-red)', 'var(--cat-sky)', 'var(--cat-orange)', 'var(--cat-violet)', 'var(--cat-lime)', 'var(--cat-indigo)', 'var(--cat-teal)', 'var(--cat-pink)', 'var(--cat-gold)', 'var(--cat-brown)'];
@@ -38,7 +39,7 @@ export function Categories() {
 
   return (
     <Screen pushed title="Категории" back="Назад" onBack={nav.pop}>
-      <div class="note-box">Переименуйте, добавьте или скройте категории. Изменения сами придут на второй телефон. Записи не теряются: при переименовании они остаются в той же категории под новым названием.</div>
+      <div class="note-box">Цветная плашка у подкатегории — характер расхода (Я должен / Мне нужно / Хочу): нажмите, чтобы сменить. Переименуйте, добавьте или скройте категории. Изменения сами придут на второй телефон. Записи не теряются: при переименовании они остаются в той же категории под новым названием.</div>
       <div style={{ padding: '0 var(--s4) var(--s3)' }}>
         <Segmented options={[['expense', 'Расходы'], ['income', 'Доходы']]} value={type} onChange={(t) => { setType(t); setOpen(null); }} />
       </div>
@@ -63,6 +64,10 @@ export function Categories() {
                 {g.cats.map((c) => (
                   <div key={c.id} class="row" style={{ paddingLeft: 64, opacity: c.hidden ? 0.5 : 1 }}>
                     <span class="rl">{c.name}{c.id === `${g.id}.0` ? <span class="muted"> (общее)</span> : ''}{c.hidden && <span class="muted"> · скрыта</span>}</span>
+                    {g.type === 'expense' && (
+                      <button class="nature-chip" style={{ borderColor: NATURE_COLOR[c.nature], color: NATURE_COLOR[c.nature] }} aria-label={`Характер: ${NATURE_NAME[c.nature]}, нажмите чтобы сменить`}
+                        onClick={() => edit(c.id, 'cat', { nature: NEXT[c.nature], ...(BASE_CATEGORY_IDS.has(c.id) ? {} : { group: g.id, name: c.name }) })}>{NATURE_NAME[c.nature]}</button>
+                    )}
                     <button class="link" aria-label={`Переименовать «${c.name}»`} onClick={() => rename(c.id, 'cat', c.name)}>✎</button>
                     {c.id !== `${g.id}.0` && (
                       <button class="link" style={{ marginLeft: 12, color: 'var(--text-2)' }} onClick={() => edit(c.id, 'cat', { hidden: !c.hidden, ...(BASE_CATEGORY_IDS.has(c.id) ? {} : { group: g.id }) })}>

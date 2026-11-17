@@ -4,7 +4,7 @@ import { Sheet, Segmented, Row, CatIcon, PERSON_COLOR } from './kit.jsx';
 import { useStore, alive, upsert, remove, updateSettings, otherPerson, PEOPLE, CURRENCIES } from '../data/store.js';
 import { accountSections, accLabel } from './Accounts.jsx';
 import { TemplatePicker } from './Templates.jsx';
-import { category, allowsItems, EXPENSE_GROUPS, INCOME_GROUPS } from '../data/categories.js';
+import { category, allowsItems, EXPENSE_GROUPS, INCOME_GROUPS, NATURES, natureOf } from '../data/categories.js';
 
 /** Receipt breakdown: name × qty = line sum. Shown only for categories where it makes sense. */
 function ItemsBlock({ items, total, onChange, onUseSum, onPickCat }) {
@@ -38,7 +38,7 @@ import { toLocalInput } from '../data/format.js';
 const PAY = ['Наличные', 'Карта', 'Перевод', 'СБП', 'Онлайн'];
 
 // fields a template carries over into a record
-const TEMPLATE_FIELDS = ['type', 'amount', 'toAmount', 'accountId', 'toAccountId', 'categoryId', 'owner', 'labels', 'note', 'payee', 'payment'];
+const TEMPLATE_FIELDS = ['type', 'amount', 'toAmount', 'accountId', 'toAccountId', 'categoryId', 'owner', 'labels', 'note', 'payee', 'payment', 'nature'];
 const pickTemplate = (t) => Object.fromEntries(TEMPLATE_FIELDS.filter((k) => t[k] !== undefined).map((k) => [k, t[k]]));
 
 /** template: undefined = record mode; true = new template; object = edit that template */
@@ -94,6 +94,7 @@ export function RecordForm({ record, defaults, template }) {
     if (f.type === 'transfer' && f.toAccountId === f.accountId) return setError('Выберите разные счета');
     if (exchange && !num(f.toAmountText)) return setError(`Сколько ${CURRENCIES[toCur]} пришло на «${acc(f.toAccountId).name}»?`);
     const { amountText, toAmountText, name, uses, toAmount, ...rest } = f;
+    if (!rest.nature || rest.type !== 'expense') delete rest.nature;
     upsert('records', { ...rest, amount, ...(exchange ? { toAmount: num(toAmountText) } : {}), categoryId: f.type === 'transfer' ? '' : f.categoryId });
     if (!record) updateSettings({ lastAccount: f.accountId });
     nav.closeSheet();
@@ -216,6 +217,21 @@ export function RecordForm({ record, defaults, template }) {
         {!isTpl && (allowsItems(f.categoryId) || (f.items || []).length > 0) && (
           <ItemsBlock items={f.items || []} total={amount} onChange={(items) => upd({ items })} onUseSum={(sum) => upd({ amountText: String(sum).replace('.', ',') })} onPickCat={(i) => setPicker(i)} />
         )}
+        {f.type === 'expense' && f.categoryId && (() => {
+          const def = natureOf(f.categoryId);
+          const cur = f.nature || def;
+          return (
+            <div class="row" style={{ flexWrap: 'wrap' }}>
+              <span class="ri" aria-hidden="true">🎯</span>
+              <span class="rl">Характер{!f.nature && <span class="muted" style={{ display: 'block', fontSize: 'var(--fs-xs)' }}>как у категории</span>}</span>
+              <div class="who">
+                {NATURES.map(([k, n, c]) => (
+                  <button key={k} class={cur === k ? 'on' : ''} onClick={() => upd({ nature: k === def ? undefined : k })}><span style={{ color: c }}>●</span> {n}</button>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
         <LabelsRow labels={f.labels || []} onChange={(labels) => upd({ labels })} />
         {!isTpl && (
           <button class="row" role="switch" aria-checked={Boolean(f.secretFrom)} onClick={() => upd({ secretFrom: f.secretFrom ? '' : otherPerson(s) })}>

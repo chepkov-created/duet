@@ -5,7 +5,7 @@ import { Screen, Segmented, Card, PERSON_COLOR } from './kit.jsx';
 import { PieDonut, DayBars, Lines, Pager, dayBuckets } from './viz.jsx';
 import { useStore, alive, visibleRecords, visibleAccounts, accountBalance, toRub, CURRENCIES } from '../data/store.js';
 import { totals, inRange, splitByItems, change } from '../data/periods.js';
-import { GROUPS, group, category } from '../data/categories.js';
+import { GROUPS, group, category, natureOf, NATURES, NATURE_NAME, NATURE_COLOR } from '../data/categories.js';
 import { rub, fmt, addDays, dayStart, addMonths } from '../data/format.js';
 import { PeriodDock, usePeriod } from './Period.jsx';
 import { Records } from './Records.jsx';
@@ -107,6 +107,61 @@ export function ExpenseExplorer({ full }) {
   );
 }
 
+/** [[nature, catId, amount], ...] for one expense: receipt items count by their own category. */
+const natureParts = (r) => splitByItems(r).map(([cid, v]) => [r.nature || natureOf(cid) || 'need', cid, v]);
+
+function NatureSection() {
+  const s = useStore();
+  const nav = useNav();
+  const [, , range] = usePeriod();
+  const [sel, setSel] = useState('all');
+  const recs = visibleRecords(s).filter((r) => r.type === 'expense' && inRange(r, range));
+  const pass = (n) => sel === 'all' || n === sel;
+  let total = 0;
+  const byNature = { must: 0, need: 0, want: 0 };
+  const byCat = {};
+  const ids = new Set();
+  for (const r of recs) for (const [n, cid, v] of natureParts(r)) {
+    byNature[n] += v;
+    if (!pass(n)) continue;
+    total += v; byCat[cid] = (byCat[cid] || 0) + v; ids.add(r.id);
+  }
+  const end = new Date(Math.min(range.to, Date.now()));
+  const days = dayBuckets(range.from, end).map((b) => {
+    const vals = { must: 0, need: 0, want: 0 };
+    for (const r of recs) if (inRange(r, { from: b.start, to: b.end })) for (const [n, , v] of natureParts(r)) vals[n] += v;
+    return { date: b.start, values: NATURES.filter(([k]) => pass(k)).map(([k, , c]) => ({ v: vals[k], color: c })) };
+  });
+  const top = Object.entries(byCat).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const max = top[0]?.[1] || 1;
+  const all = byNature.must + byNature.need + byNature.want || 1;
+  return (
+    <Section title="Характер расходов" sub="Сколько я должен заплатить, сколько нужно, а сколько просто хочу?">
+      <Segmented options={[['all', 'Все'], ...NATURES.map(([k, n]) => [k, n])]} value={sel} onChange={setSel} />
+      <div class="caption" style={{ marginTop: 'var(--s4)' }}>{range.label}</div>
+      <div class="big-amount num">{rub(total)}</div>
+      {sel === 'all' && (
+        <>
+          <div class="cur-bar">{NATURES.map(([k, , c]) => byNature[k] > 0 && <div key={k} style={{ flex: byNature[k] / all, background: c }} />)}</div>
+          <div class="chart-legend" style={{ paddingLeft: 0, margin: '8px 0 var(--s3)' }}>
+            {NATURES.map(([k, n, c]) => <span key={k}><i style={{ background: c }} />{n} · {rub(byNature[k])} · {Math.round((byNature[k] / all) * 100)}%</span>)}
+          </div>
+        </>
+      )}
+      <DayBars days={days} legend={NATURES.filter(([k]) => pass(k)).map(([, n, c]) => [c, n])} />
+      <div class="caption" style={{ margin: 'var(--s4) 0 var(--s2)' }}>По категориям</div>
+      {top.length === 0 && <div class="muted">Нет трат за период</div>}
+      {top.map(([cid, v]) => (
+        <button key={cid} class="bar-row" style={{ width: '100%', textAlign: 'left' }} onClick={() => nav.push(Records, { title: category(cid).name, categoryIds: [cid], range, back: 'Расходы' })}>
+          <div class="bar-label"><span>{category(cid).name}</span><span class="num">{rub(v)}</span></div>
+          <div class="bar"><div style={{ width: `${(v / max) * 100}%`, background: sel === 'all' ? NATURE_COLOR[natureOf(cid)] : NATURE_COLOR[sel] }} /></div>
+        </button>
+      ))}
+      {ids.size > 0 && <button class="ghost-btn" style={{ marginTop: 'var(--s3)' }} onClick={() => nav.push(Records, { title: sel === 'all' ? 'Расходы' : NATURE_NAME[sel], ids: [...ids], back: 'Расходы' })}>Показать записи ({ids.size})</button>}
+    </Section>
+  );
+}
+
 export function ExpensesScreen() {
   const s = useStore();
   const nav = useNav();
@@ -119,6 +174,7 @@ export function ExpensesScreen() {
   return (
     <Screen pushed title="Расходы" back="Назад" onBack={nav.pop}>
       <Section title="Категории и метки" sub="Куда уходят мои деньги?"><ExpenseExplorer full /></Section>
+      <NatureSection />
       <Section title="По категориям" sub="На что больше всего">
         {top.length === 0 && <div class="muted">Расходов за период нет</div>}
         {top.map(([cid, v]) => (

@@ -2,7 +2,7 @@ import { useState } from 'preact/hooks';
 import { useNav } from './App.jsx';
 import { Screen, RecordRow, Empty } from './kit.jsx';
 import { useStore, alive, visibleRecords, inRub, hiddenFromMe } from '../data/store.js';
-import { category, groupOf } from '../data/categories.js';
+import { category, groupOf, natureOfRecord, NATURE_NAME } from '../data/categories.js';
 import { dayLabel, fmt, dayStart } from '../data/format.js';
 import { effectOn, accountBalance } from '../data/store.js';
 import { AdjustBalance, AccountForm } from './Accounts.jsx';
@@ -23,7 +23,7 @@ function searchText(r, accounts) {
   return norm([
     r.note, r.payee, ...(r.labels || []), ...(r.items || []).map((it) => it.name), r.owner,
     r.categoryId ? c.name : '', r.categoryId ? groupOf(r.categoryId)?.name : '',
-    acc(r.accountId)?.name, acc(r.toAccountId)?.name, TYPE_WORDS[r.type],
+    acc(r.accountId)?.name, acc(r.toAccountId)?.name, TYPE_WORDS[r.type], NATURE_NAME[natureOfRecord(r)],
     `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`, `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`,
     String(a), String(a).replace('.', ','), a.toFixed(2), a.toFixed(2).replace('.', ','), String(whole), whole.toLocaleString('ru-RU').replace(/\s/g, ' '), r.source,
   ].filter(Boolean).join(' | '));

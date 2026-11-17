@@ -27,7 +27,7 @@ export function PeriodDock({ bottom = 'calc(var(--tabbar-h) + var(--safe-b))' })
   const f = s.settings.filter || {};
   const accounts = alive(s.ledger.accounts);
   const accValue = !f.accounts?.length ? 'Все' : f.accounts.length === 1 ? accLabel(accounts.find((a) => a.id === f.accounts[0])) : `${f.accounts.length} счёта`;
-  const catValue = [f.type === 'income' ? 'Доходы' : f.type === 'expense' ? 'Расходы' : '', f.cats?.length ? `${f.cats.length} кат.` : '', f.labels?.length ? `${f.labels.length} мет.` : ''].filter(Boolean).join(' · ') || 'Все';
+  const catValue = [f.type === 'income' ? 'Доходы' : f.type === 'expense' ? 'Расходы' : '', f.cats?.length ? `${f.cats.length} кат.` : '', f.labels?.length ? `${f.labels.length} мет.` : '', f.natures?.length ? `${f.natures.length} хар.` : ''].filter(Boolean).join(' · ') || 'Все';
   const active = filterCount(f);
 
   // Swipe left/right on the panel switches the three pages; drag the handle up/down to open/close.
