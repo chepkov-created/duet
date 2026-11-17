@@ -64,7 +64,10 @@ const BASE = [
   },
 ];
 
-export const BASE_CATEGORY_IDS = new Set(BASE.flatMap((g) => [g.id, ...g.subs.map((_, i) => `${g.id}.${i}`)]));
+// Groups where a receipt breakdown ("Позиции чека") makes sense; switchable per group in the categories editor.
+const ITEMS_BY_DEFAULT = new Set(['food', 'shop', 'home', 'car', 'tech']);
+
+export const BASE_CATEGORY_IDS =new Set(BASE.flatMap((g) => [g.id, ...g.subs.map((_, i) => `${g.id}.${i}`)]));
 
 // Live bindings: rebuilt whenever the family edits categories, so every screen sees the new names.
 export let GROUPS = [];       // visible groups, each with .cats (visible subcategories)
@@ -96,6 +99,7 @@ export function applyCategoryEdits(edits = []) {
   for (const g of groups) {
     const ge = ed[g.id];
     if (ge) Object.assign(g, ge.name ? { name: ge.name } : {}, ge.color ? { color: ge.color } : {}, ge.icon ? { icon: ge.icon } : {}, { hidden: Boolean(ge.hidden) });
+    g.items = ge && typeof ge.items === 'boolean' ? ge.items : ITEMS_BY_DEFAULT.has(g.id);
     for (const c of g.cats) {
       const ce = ed[c.id];
       if (ce) Object.assign(c, ce.name ? { name: ce.name } : {}, { hidden: Boolean(ce.hidden) });
@@ -116,5 +120,8 @@ applyCategoryEdits([]);
 export const category = (id) => byId[id] || { id, name: 'Без категории', group: 'other', color: 'var(--cat-brown)', icon: '❔', type: 'expense' };
 export const group = (id) => groupById[id];
 export const groupOf = (catId) => groupById[category(catId).group];
+/** Should the record form offer a receipt breakdown for this category? */
+export const allowsItems = (catId) => Boolean(catId && groupOf(catId)?.items);
+
 /** Balance corrections are not spending or income. */
 export const isAdjustment = (catId) => typeof catId === 'string' && catId.startsWith('adj.');

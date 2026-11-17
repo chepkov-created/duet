@@ -48,7 +48,7 @@ export function Categories() {
             <div class="row">
               <button style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, textAlign: 'left' }} aria-expanded={open === g.id} onClick={() => setOpen(open === g.id ? null : g.id)}>
                 <CatIcon catId={`${g.id}.0`} size={34} />
-                <span style={{ flex: 1, fontWeight: 600 }}>{g.name}{g.hidden && <span class="muted"> · скрыта</span>}</span>
+                <span style={{ flex: 1, fontWeight: 600 }}>{g.name}{g.items && <span aria-label="с позициями чека"> 🧾</span>}{g.hidden && <span class="muted"> · скрыта</span>}</span>
                 <span class="muted">{g.cats.length}</span>
                 <span class="chev" aria-hidden="true">{open === g.id ? '⌄' : '›'}</span>
               </button>
@@ -58,6 +58,7 @@ export function Categories() {
                 <div style={{ display: 'flex', gap: 8, padding: 'var(--s2) var(--s4) var(--s2) 64px', flexWrap: 'wrap' }}>
                   <button class="pill-btn" onClick={() => rename(g.id, 'group', g.name)}>✎ Переименовать группу</button>
                   <button class="pill-btn" onClick={() => edit(g.id, 'group', { hidden: !g.hidden })}>{g.hidden ? 'Показать группу' : 'Скрыть группу'}</button>
+                  <button class="pill-btn" aria-pressed={g.items} onClick={() => edit(g.id, 'group', { items: !g.items })}>🧾 Позиции чека: {g.items ? 'вкл' : 'выкл'}</button>
                 </div>
                 {g.cats.map((c) => (
                   <div key={c.id} class="row" style={{ paddingLeft: 64, opacity: c.hidden ? 0.5 : 1 }}>

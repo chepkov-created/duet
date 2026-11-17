@@ -21,7 +21,7 @@ function searchText(r, accounts) {
   const a = r.orig ? r.orig.amount : r.amount;
   const whole = Math.trunc(a);
   return norm([
-    r.note, r.payee, ...(r.labels || []), r.owner,
+    r.note, r.payee, ...(r.labels || []), ...(r.items || []).map((it) => it.name), r.owner,
     r.categoryId ? c.name : '', r.categoryId ? groupOf(r.categoryId)?.name : '',
     acc(r.accountId)?.name, acc(r.toAccountId)?.name, TYPE_WORDS[r.type],
     `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`, `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`,
