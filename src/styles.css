@@ -370,3 +370,13 @@ input, select, textarea { font: inherit; color: inherit; }
 .dock-foot { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; margin-top: 6px; }
 .dock-foot .pager { margin-top: 0; }
 .dock-toggle { justify-self: end; color: var(--accent); font-size: var(--fs-s); font-weight: 600; padding: 6px 2px; display: inline-flex; gap: 4px; align-items: center; }
+
+/* analytics screens */
+.an-sec { background: var(--surface); margin: 0 0 var(--s3); padding: var(--s4) var(--s4) var(--s5); }
+.an-head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--s3); border-bottom: 1px solid var(--line); padding-bottom: var(--s3); margin-bottom: var(--s3); }
+.an-head h2 { margin: 0; font-size: var(--fs-xl); }
+.an-head p { margin: 4px 0 0; color: var(--text-2); font-size: var(--fs-s); }
+.chart-tip { position: absolute; top: 0; right: 0; background: var(--surface-3); border-radius: var(--r-s); padding: 4px 8px; font-size: var(--fs-xs); pointer-events: none; }
+.chart-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: var(--fs-xs); color: var(--text-2); margin-top: 4px; padding-left: 40px; }
+.chart-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.cur-bar { display: flex; height: 26px; border-radius: 6px; overflow: hidden; gap: 2px; background: var(--surface-2); }

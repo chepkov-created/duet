@@ -29,7 +29,7 @@ function searchText(r, accounts) {
   ].filter(Boolean).join(' | '));
 }
 
-export function Records({ accountId, categoryIds, title = 'Записи', range, back = 'Назад', owner, initialQuery, everything }) {
+export function Records({ accountId, categoryIds, title = 'Записи', range, back = 'Назад', owner, initialQuery, everything, ids }) {
   const s = useStore();
   const nav = useNav();
   const [q, setQ] = useState(initialQuery || '');
@@ -45,7 +45,8 @@ export function Records({ accountId, categoryIds, title = 'Записи', range,
   if (owner) recs = visibleRecords({ ...s, settings: { ...s.settings, view: owner } });
   // Search: whoever the switch shows (yourself by default), without category/account filters.
   if (everything) recs = visibleRecords(s, { ignoreFilter: true });
-  if (categoryIds) recs = recs.filter((r) => categoryIds.includes(r.categoryId));
+  if (categoryIds) recs = recs.filter((r) => categoryIds.includes(r.categoryId) || (r.items || []).some((it) => categoryIds.includes(it.categoryId)));
+  if (ids) { const set = new Set(ids); recs = recs.filter((r) => set.has(r.id)); }
   if (range) recs = recs.filter((r) => { const d = new Date(r.date); return d >= range.from && d <= range.to; });
   const needle = norm(q);
   if (needle) {

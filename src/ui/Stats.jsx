@@ -11,6 +11,7 @@ import { Accounts } from './Accounts.jsx';
 import { Scheduled } from './Planning.jsx';
 import { PersonSwitch } from './Overview.jsx';
 import { FilterBar, FilterButton } from './Filter.jsx';
+import { BalanceScreen, ExpensesScreen, CashFlowScreen } from './Analytics.jsx';
 
 export function Stats() {
   const s = useStore();
@@ -35,11 +36,11 @@ export function Stats() {
       <div style={{ padding: '0 var(--s4)' }}><PersonSwitch /></div>
       <FilterBar />
       <div class="stack" style={{ paddingBottom: 140 }}>
-        <Tile label="Баланс" value={rub(series[series.length - 1]?.value || 0)} onClick={() => nav.push(Accounts, {})}>
+        <Tile label="Баланс" value={rub(series[series.length - 1]?.value || 0)} onClick={() => nav.push(BalanceScreen, {})}>
           <div style={{ width: 74 }}><Area series={series} height={56} mini /></div>
         </Tile>
-        <Tile label="Расходы" value={rub(t.expense)} onClick={open}><MiniDonut parts={parts} /></Tile>
-        <Tile label="Денежный поток" value={rub(t.flow)} onClick={open}>
+        <Tile label="Расходы" value={rub(t.expense)} onClick={() => nav.push(ExpensesScreen, {})}><MiniDonut parts={parts} /></Tile>
+        <Tile label="Денежный поток" value={rub(t.flow)} onClick={() => nav.push(CashFlowScreen, {})}>
           <div style={{ width: 74, display: 'grid', gap: 8 }}>
             <div class="bar" style={{ height: 14, borderRadius: 2 }}><div style={{ width: `${(t.income / max) * 100}%`, background: 'var(--pos)', borderRadius: 2 }} /></div>
             <div class="bar" style={{ height: 14, borderRadius: 2 }}><div style={{ width: `${(t.expense / max) * 100}%`, background: 'var(--neg)', borderRadius: 2 }} /></div>

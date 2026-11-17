@@ -13,6 +13,7 @@ import { AccountForm, AddAccount, Accounts, AccountFolder, accountSections, accL
 import { SyncScreen } from './Settings.jsx';
 import { SyncChip } from './More.jsx';
 import { QuickTemplates } from './Templates.jsx';
+import { ExpenseExplorer, ExpensesScreen, BalanceScreen, CashFlowScreen } from './Analytics.jsx';
 import { FilterBar, FilterButton } from './Filter.jsx';
 
 export function Overview() {
@@ -57,7 +58,7 @@ export function Overview() {
 
         <QuickTemplates />
 
-        <Card title="Денежный поток" menu={<Menu items={[['Открыть отчёт', () => nav.push(Reports, { pushed: true })]]} />} onMore={() => nav.push(Reports, { pushed: true })}>
+        <Card title="Денежный поток" menu={<Menu items={[['Открыть отчёт', () => nav.push(Reports, { pushed: true })]]} />} onMore={() => nav.push(CashFlowScreen, {})}>
           <div class="caption">Этот месяц</div>
           <div class="big-amount num">{rub(t.flow)}</div>
           <div class="bar-row">
@@ -70,7 +71,7 @@ export function Overview() {
           </div>
         </Card>
 
-        <Card title="Динамика баланса" menu={<Menu items={[['Все счета', () => nav.push(Accounts, { pushed: true })]]} />} onMore={() => nav.push(Accounts, { pushed: true })}>
+        <Card title="Динамика баланса" menu={<Menu items={[['Все счета', () => nav.push(Accounts, { pushed: true })]]} />} onMore={() => nav.push(BalanceScreen, {})}>
           <div class="caption">Сегодня{s.settings.view !== 'all' ? ` · счета: ${s.settings.view}` : ' · все счета в рублях'}</div>
           <div class="big-amount num">{rub(totalBalance)}</div>
           <Area series={series} />
@@ -127,8 +128,8 @@ function AccountsGrid({ accounts, records }) {
             <div class="acc-section"><span style={{ color: sec.color }}>●</span>{sec.title}<b class="num">{rub(rubOf(sec.items))}</b></div>
             <div class="acc-grid">
               {tiles.map((t) => {
-                if (t.a) {
-                  const a = t.a;
+                if (t.a || t.items.length === 1) {
+                  const a = t.a || t.items[0]; // a "folder" with one card is just that card
                   return (
                     <button key={a.id} class="acc" onClick={() => nav.push(Records, { accountId: a.id, title: accLabel(a) })}>
                       <span class="badge-ico" style={{ background: a.color }} aria-hidden="true">{ACC_ICON[a.kind] || '💳'}</span>
@@ -188,28 +189,11 @@ export function PersonSwitch() {
   );
 }
 
-function ExpensesCard({ recs, range }) {
+function ExpensesCard() {
   const nav = useNav();
-  const [mode, setMode] = useState('cats');
-  const { groups } = byCategory(recs, range);
-  const owners = byOwner(recs, range);
-  const total = Object.values(groups).reduce((a, b) => a + b, 0);
-  const LABEL_COLORS = ['var(--cat-teal)', 'var(--cat-orange)', 'var(--cat-lime)', 'var(--cat-violet)'];
-  const parts = mode === 'cats'
-    ? GROUPS.filter((g) => groups[g.id]).map((g) => ({ key: g.id, value: groups[g.id], color: g.color, name: g.name }))
-    : Object.entries(owners).map(([k, v], i) => ({ key: k, value: v, color: PERSON_COLOR[k] || LABEL_COLORS[i % 4], name: k }));
   return (
-    <Card title="Расходы" onMore={() => nav.push(Reports, { pushed: true })}>
-      <Segmented options={[['cats', 'Категории'], ['labels', 'Метки']]} value={mode} onChange={setMode} />
-      <div class="caption" style={{ margin: 'var(--s4) 0 var(--s3)' }}>Этот месяц</div>
-      <Donut parts={parts} center={<><div style={{ fontSize: 'var(--fs-xl)' }}>Все</div><div class="num" style={{ fontWeight: 700, fontSize: 'var(--fs-l)', marginTop: 4 }}>{rub(total)}</div></>} />
-      <div style={{ marginTop: 'var(--s3)', display: 'flex', flexWrap: 'wrap', gap: '6px 14px' }}>
-        {parts.map((p) => (
-          <span key={p.key} class="muted" style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-            <span class="dot" style={{ background: p.color, width: 9, height: 9 }} />{p.name} · {total ? Math.round((p.value / total) * 100) : 0}%
-          </span>
-        ))}
-      </div>
+    <Card title="Расходы" onMore={() => nav.push(ExpensesScreen, {})}>
+      <ExpenseExplorer />
     </Card>
   );
 }
