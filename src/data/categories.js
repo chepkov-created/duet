@@ -53,6 +53,11 @@ const BASE = [
     subs: ['Переводы людям', 'Семье', 'Друзьям', 'В долг'],
   },
   {
+    // "Изменение баланса счёта": a correction to match the real balance. Moves money, never counted as spending or income.
+    id: 'adj', name: 'Изменение баланса счёта', color: 'var(--cat-grey)', icon: '⚖️', type: 'system',
+    subs: ['Изменение баланса счёта'],
+  },
+  {
     id: 'inc', name: 'Доход', color: 'var(--cat-gold)', icon: '💰', type: 'income',
     subs: ['Доход', 'Зарплата', 'Проценты, дивиденды', 'Продажа вещей', 'Аренда (доход)', 'Стипендия', 'Подработка',
       'Кэшбэк, бонусы', 'Выигрыши, прочее', 'Возвраты', 'Алименты', 'Подарки (доход)', 'Переводы от людей'],
@@ -102,7 +107,7 @@ export function applyCategoryEdits(edits = []) {
   CATEGORIES = groups.flatMap((g) => g.cats.map((c) => ({ ...c, group: g.id, color: g.color, icon: g.icon, type: g.type, groupHidden: Boolean(g.hidden) })));
   byId = Object.fromEntries(CATEGORIES.map((c) => [c.id, c]));
   groupById = Object.fromEntries(groups.map((g) => [g.id, g]));
-  GROUPS = groups.filter((g) => !g.hidden).map((g) => ({ ...g, cats: g.cats.filter((c) => !c.hidden) }));
+  GROUPS = groups.filter((g) => !g.hidden && g.type !== 'system').map((g) => ({ ...g, cats: g.cats.filter((c) => !c.hidden) }));
   EXPENSE_GROUPS = GROUPS.filter((g) => g.type === 'expense');
   INCOME_GROUPS = GROUPS.filter((g) => g.type === 'income');
 }
@@ -111,3 +116,5 @@ applyCategoryEdits([]);
 export const category = (id) => byId[id] || { id, name: 'Без категории', group: 'other', color: 'var(--cat-brown)', icon: '❔', type: 'expense' };
 export const group = (id) => groupById[id];
 export const groupOf = (catId) => groupById[category(catId).group];
+/** Balance corrections are not spending or income. */
+export const isAdjustment = (catId) => typeof catId === 'string' && catId.startsWith('adj.');

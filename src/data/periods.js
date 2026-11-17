@@ -1,6 +1,6 @@
 import { addDays, addMonths, dayStart, dayShort, ddmmyyyy } from './format.js';
 import { signed, accountBalance, toRub } from './store.js';
-import { category } from './categories.js';
+import { category, isAdjustment } from './categories.js';
 
 // period: {kind:'rolling', key} | {kind:'cal', unit, offset} | {kind:'range', from, to}
 export const ROLLING = [['7d', '7 дней'], ['30d', '30 дней'], ['12w', '12 недель'], ['6m', '6 месяцев'], ['1y', '1 год']];
@@ -45,7 +45,8 @@ function calLabel(unit, o, from, to) {
   return String(from.getFullYear());
 }
 
-export const inRange = (r, { from, to }) => { const d = new Date(r.date); return d >= from && d <= to && r.status !== 'planned'; };
+// Every period sum goes through here: planned payments and balance corrections are left out of spending/income.
+export const inRange = (r, { from, to }) => { const d = new Date(r.date); return d >= from && d <= to && r.status !== 'planned' && !isAdjustment(r.categoryId); };
 
 export function totals(records, range) {
   let income = 0, expense = 0, nIn = 0, nOut = 0;

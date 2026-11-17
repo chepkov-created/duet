@@ -4,7 +4,8 @@ import { Screen, RecordRow, Empty } from './kit.jsx';
 import { useStore, alive, visibleRecords, inRub, hiddenFromMe } from '../data/store.js';
 import { category, groupOf } from '../data/categories.js';
 import { dayLabel, fmt, dayStart } from '../data/format.js';
-import { effectOn } from '../data/store.js';
+import { effectOn, accountBalance } from '../data/store.js';
+import { AdjustBalance, AccountForm } from './Accounts.jsx';
 import { PersonSwitch } from './Overview.jsx';
 import { FilterBar, FilterButton } from './Filter.jsx';
 
@@ -33,6 +34,7 @@ export function Records({ accountId, categoryIds, title = 'Записи', range,
   const nav = useNav();
   const [q, setQ] = useState(initialQuery || '');
   const [limit, setLimit] = useState(200);
+  const [adjusting, setAdjusting] = useState(false);
   const accounts = alive(s.ledger.accounts);
   const accIds = accountId ? [].concat(accountId) : null;
   const singleAcc = accIds?.length === 1 ? accounts.find((a) => a.id === accIds[0]) : null;
@@ -64,6 +66,20 @@ export function Records({ accountId, categoryIds, title = 'Записи', range,
     <Screen pushed title={title} back={back} onBack={nav.pop} right={<>{!accountId && !everything && <FilterButton />}<button class="link" onClick={() => nav.record(null, singleAcc ? { accountId: singleAcc.id } : undefined)}>Добавить</button></>}>
       {!accountId && <div style={{ padding: '0 var(--s4) var(--s3)' }}><PersonSwitch /></div>}
       {!accountId && !everything && <FilterBar />}
+      {singleAcc && (() => {
+        const bal = accountBalance(singleAcc, alive(s.ledger.records));
+        return (
+          <div class="card" style={{ margin: '0 var(--s4) var(--s3)' }}>
+            <div class="caption">Баланс</div>
+            <div class="big-amount num">{fmt(bal, singleAcc.currency)}</div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button class="pill-btn" onClick={() => setAdjusting(true)}>✎ Изменить баланс</button>
+              <button class="pill-btn" onClick={() => nav.push(AccountForm, { account: singleAcc })}>⚙️ Настройки счёта</button>
+            </div>
+            {adjusting && <AdjustBalance account={singleAcc} current={bal} onClose={() => setAdjusting(false)} />}
+          </div>
+        );
+      })()}
       <label class="search">
         <span aria-hidden="true">🔍</span>
         <span class="sr-only">Поиск по записям</span>

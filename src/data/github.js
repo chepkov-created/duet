@@ -61,7 +61,7 @@ export async function readLedger({ owner, repo, token, path }) {
 /** Writes the file; returns the new sha. Throws GitHubError with status 409/422 on sha conflict. */
 export async function writeLedger({ owner, repo, token, path }, data, sha, message) {
   const url = `${API}/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}`;
-  const body = { message, content: b64encode(JSON.stringify(data, null, 1)) };
+  const body = { message, content: b64encode(JSON.stringify(data)) }; // compact: the history is thousands of records
   if (sha) body.sha = sha;
   const res = await fetch(url, { method: 'PUT', headers: { ...headers(token), 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   if (!res.ok) throw await explain(res);

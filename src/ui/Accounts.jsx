@@ -1,6 +1,6 @@
 import { useState } from 'preact/hooks';
 import { useNav } from './App.jsx';
-import { Screen, Row, Empty, PERSON_COLOR } from './kit.jsx';
+import { Screen, Row, Empty, Sheet, PERSON_COLOR } from './kit.jsx';
 import { useStore, alive, upsert, remove, accountBalance, toRub, PEOPLE, CURRENCIES } from '../data/store.js';
 import { rub, fmt } from '../data/format.js';
 import { Records } from './Records.jsx';
@@ -62,6 +62,39 @@ export function RatesNote() {
   return <div class="note-box">Курс для пересчёта: $ = {rub(r.USD)}, € = {rub(r.EUR)} {r.manual ? '(задан вручную)' : `(ЦБ, ${new Date(r.at).toLocaleDateString('ru-RU')})`}</div>;
 }
 
+/** Creates a correction record so the account shows `target`. Returns false when nothing changes. */
+export function adjustBalance(account, current, target, me) {
+  const diff = Math.round((target - current) * 100) / 100;
+  if (!diff) return false;
+  upsert('records', {
+    type: diff > 0 ? 'income' : 'expense', amount: Math.abs(diff), accountId: account.id, categoryId: 'adj.0',
+    date: new Date().toISOString(), owner: account.owner || me, labels: [], note: 'Изменение баланса счёта', payee: '', status: 'done', payment: '',
+  });
+  return true;
+}
+
+/** Sheet: type the real balance, a correction record is added for the difference. */
+export function AdjustBalance({ account, current, onClose }) {
+  const s = useStore();
+  const [text, setText] = useState(String(Math.round(current * 100) / 100).replace('.', ','));
+  const target = Number(String(text).replace(/\s/g, '').replace(',', '.'));
+  const valid = text.trim() !== '' && Number.isFinite(target);
+  const diff = valid ? target - current : 0;
+  const save = () => { if (valid) adjustBalance(account, current, target, s.settings.me); onClose(); };
+  return (
+    <Sheet short title="Изменить баланс" onClose={onClose} right={<button class="link strong" onClick={save} disabled={!valid}>Готово</button>}
+      footer={<button class="btn primary" disabled={!valid || !diff} onClick={save}>Сохранить</button>}>
+      <div class="note-box">Сейчас в приложении: <b class="num">{fmt(current, account.currency)}</b>. Введите, сколько на счёте на самом деле. Разница запишется как «Изменение баланса счёта» и не попадёт в траты и доходы.</div>
+      <label class="amount-box">
+        <span class="cur">{account.currency || 'RUB'}</span>
+        <span class="sr-only">Реальный баланс</span>
+        <input class="amount-input num transfer" inputMode="decimal" autoFocus value={text} onInput={(e) => setText(e.currentTarget.value.replace(/[^\d.,\s-]/g, ''))} />
+      </label>
+      {valid && diff !== 0 && <div class="note-box">Будет записано: <b class="num" style={{ color: diff > 0 ? 'var(--pos-text)' : 'var(--neg-text)' }}>{fmt(diff, account.currency, { sign: true })}</b></div>}
+    </Sheet>
+  );
+}
+
 export function AccountForm({ account }) {
   const nav = useNav();
   const s = useStore();
@@ -72,9 +105,14 @@ export function AccountForm({ account }) {
   const set = (k) => (e) => setF({ ...f, [k]: e.currentTarget.value });
   const save = () => {
     if (!f.name.trim()) return;
-    // The user types the balance they see now; the starting balance is derived from it.
-    const movement = account ? current - (Number(account.initial) || 0) : 0;
-    upsert('accounts', { ...f, name: f.name.trim(), group: (f.group || '').trim() || undefined, initial: Number(String(balance).replace(/\s/g, '').replace(',', '.')) - movement });
+    const typed = Number(String(balance).replace(/\s/g, '').replace(',', '.'));
+    if (account) {
+      // Existing account: keep the start, record the difference as "Изменение баланса счёта" (like Wallet does).
+      upsert('accounts', { ...f, name: f.name.trim(), group: (f.group || '').trim() || undefined });
+      if (Number.isFinite(typed)) adjustBalance(account, current, typed, s.settings.me);
+    } else {
+      upsert('accounts', { ...f, name: f.name.trim(), group: (f.group || '').trim() || undefined, initial: Number.isFinite(typed) ? typed : 0 });
+    }
     nav.pop();
   };
   const del = () => {
@@ -101,7 +139,7 @@ export function AccountForm({ account }) {
             <option value="RUB">Рубли ₽</option><option value="USD">Доллары $</option><option value="EUR">Евро €</option>
           </select>
         </label>
-        <label class="row"><span class="rl">Баланс сейчас, {CURRENCIES[f.currency || 'RUB']}</span><input inputMode="decimal" value={balance} onInput={(e) => setBalance(e.currentTarget.value)} /></label>
+        <label class="row"><span class="rl">Баланс сейчас, {CURRENCIES[f.currency || 'RUB']}{account && <span class="muted" style={{ display: 'block', fontSize: 'var(--fs-xs)' }}>изменение запишется отдельной записью</span>}</span><input inputMode="decimal" value={balance} onInput={(e) => setBalance(e.currentTarget.value)} /></label>
         <label class="row"><span class="rl">Объединить в</span><input value={f.group || ''} onInput={set('group')} placeholder="Необязательно, например «Подушка»" maxLength={30} /></label>
         <div class="row"><span class="rl">Цвет</span>
           <div class="swatches">{COLORS.map((c) => <button key={c} aria-label="Цвет" class={f.color === c ? 'on' : ''} style={{ background: c }} onClick={() => setF({ ...f, color: c })} />)}</div>
