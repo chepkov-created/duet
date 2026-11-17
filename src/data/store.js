@@ -6,7 +6,7 @@ import { applyCategoryEdits, natureOfRecord } from './categories.js';
 const LEDGER_KEY = 'duet.ledger';
 const SETTINGS_KEY = 'duet.settings';
 // `categories` holds the family's renames/new/hidden categories; it syncs like everything else.
-const COLLECTIONS = ['accounts', 'records', 'scheduled', 'budgets', 'templates', 'categories'];
+const COLLECTIONS = ['accounts', 'records', 'scheduled', 'budgets', 'templates', 'categories', 'devices'];
 
 export const PEOPLE = ['Миша', 'Арина'];
 

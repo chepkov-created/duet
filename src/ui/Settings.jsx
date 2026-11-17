@@ -5,6 +5,7 @@ import { useStore, updateSettings, syncNow, syncConfigured, PEOPLE, getState, re
 import { Accounts } from './Accounts.jsx';
 import { Categories } from './Categories.jsx';
 import { checkAccess } from '../data/github.js';
+import { PushSettings } from './Push.jsx';
 
 export function Onboarding() {
   return (
@@ -126,6 +127,8 @@ export function Settings() {
         ))}
         <Row label={<span class="accent">Взять курс ЦБ сейчас</span>} chevron={false} onClick={() => refreshRates(true)} value={st.rates?.manual ? 'сейчас вручную' : st.rates?.at ? `ЦБ, ${new Date(st.rates.at).toLocaleDateString('ru-RU')}` : ''} />
       </div>
+
+      <PushSettings />
 
       <div class="group-label">Данные</div>
       <div class="list inset plain">

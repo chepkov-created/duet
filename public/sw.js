@@ -1,5 +1,5 @@
 // Offline shell: cache the app files, never cache API calls.
-const CACHE = 'duet-v1';
+const CACHE = 'duet-v2';
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(['./', './index.html', './manifest.webmanifest', './icon.svg'])));
@@ -26,4 +26,22 @@ self.addEventListener('fetch', (e) => {
       })
       .catch(() => caches.match(e.request).then((r) => r || caches.match('./index.html')))
   );
+});
+
+// Reminders from the daily robot (duet-data / GitHub Actions).
+self.addEventListener('push', (e) => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch { d = { body: e.data && e.data.text() }; }
+  e.waitUntil(self.registration.showNotification(d.title || 'Дуэт', {
+    body: d.body || '', icon: './icon-180.png', badge: './icon-180.png', tag: d.tag, data: { url: d.url || './' },
+  }));
+});
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const url = new URL(e.notification.data?.url || './', self.registration.scope).href;
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+    const open = list.find((c) => c.url.startsWith(self.registration.scope));
+    return open ? open.focus() : self.clients.openWindow(url);
+  }));
 });
