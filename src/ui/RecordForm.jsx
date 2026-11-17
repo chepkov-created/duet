@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useState, useRef, useLayoutEffect } from 'preact/hooks';
 import { useNav } from './App.jsx';
 import { Sheet, Segmented, Row, CatIcon, PERSON_COLOR } from './kit.jsx';
 import { useStore, alive, upsert, remove, undoDelete, updateSettings, otherPerson, PEOPLE, CURRENCIES } from '../data/store.js';
@@ -10,16 +10,27 @@ import { category, allowsItems, EXPENSE_GROUPS, INCOME_GROUPS, NATURES, natureOf
 export const groupDigits = (raw) => {
   const s = String(raw || '').replace(/[^\d.,]/g, '').replace('.', ',');
   const [int, ...rest] = s.split(',');
-  const g = int.replace(/^0+(?=\d)/, '').replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  const g = int.replace(/^0+(?=\d)/, '').replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   return rest.length ? `${g},${rest.join('').slice(0, 2)}` : g;
 };
 
 /** Amount field: groups thousands while typing, keeps the caret in place, shrinks long numbers to fit. */
 function AmountInput({ value, onChange, cls, big, placeholder, autoFocus }) {
   const shown = groupDigits(value);
-  const digits = shown.replace(/\D/g, '').length;
   const base = big ? 64 : 40;
-  const size = Math.max(big ? 26 : 20, base - Math.max(0, digits - (big ? 6 : 7)) * (big ? 5.5 : 3.5));
+  const ref = useRef(null);
+  const [size, setSize] = useState(base);
+  // Measure the real text width in the real font and shrink until it fits with a margin.
+  useLayoutEffect(() => {
+    const el = ref.current; if (!el) return;
+    const cs = getComputedStyle(el);
+    const ctx = (AmountInput.c ||= document.createElement('canvas').getContext('2d'));
+    ctx.font = `${cs.fontWeight} ${base}px ${cs.fontFamily}`;
+    const text = (shown || placeholder || '0') + (cls === 'expense' ? '-' : '');
+    const w = ctx.measureText(text).width + 6;
+    const avail = el.clientWidth - 12;
+    setSize(Math.max(18, Math.min(base, Math.floor(base * avail / w))));
+  }, [shown, base]);
   const onInput = (e) => {
     const el = e.currentTarget;
     const caret = el.selectionStart ?? el.value.length;
@@ -33,7 +44,7 @@ function AmountInput({ value, onChange, cls, big, placeholder, autoFocus }) {
       try { el.setSelectionRange(pos, pos); } catch { /* not focused */ }
     });
   };
-  return <input class={`amount-input num ${cls}`} style={{ fontSize: size }} inputMode="decimal" placeholder={placeholder} autoFocus={autoFocus} value={shown} onInput={onInput} />;
+  return <input ref={ref} class={`amount-input num ${cls}`} style={{ fontSize: size }} inputMode="decimal" placeholder={placeholder} autoFocus={autoFocus} value={shown} onInput={onInput} />;
 }
 
 /** Receipt breakdown: name × qty = line sum. Shown only for categories where it makes sense. */
