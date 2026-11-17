@@ -348,3 +348,8 @@ input, select, textarea { font: inherit; color: inherit; }
 
 /* receipt item category chip */
 .item-cat { width: 28px; height: 28px; border-radius: var(--r-pill); flex: none; font-size: 14px; display: grid; place-items: center; color: #fff; }
+
+/* folders + ordering */
+.acc.folder .acc-sub { color: var(--text-2); font-size: var(--fs-xs); }
+.order-btn { width: 36px; height: 36px; border-radius: var(--r-s); background: var(--surface-2); color: var(--accent); font-size: var(--fs-l); margin-left: 6px; }
+.order-btn:disabled { opacity: 0.3; }

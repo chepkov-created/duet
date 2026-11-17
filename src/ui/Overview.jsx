@@ -9,7 +9,7 @@ import { rub, fmt } from '../data/format.js';
 import { Records } from './Records.jsx';
 import { Reports } from './Reports.jsx';
 import { Scheduled, Budgets, budgetSpent } from './Planning.jsx';
-import { AccountForm, Accounts, accountSections, accLabel, ACC_ICON } from './Accounts.jsx';
+import { AccountForm, Accounts, AccountFolder, accountSections, accLabel, ACC_ICON } from './Accounts.jsx';
 import { SyncScreen } from './Settings.jsx';
 import { SyncChip } from './More.jsx';
 import { QuickTemplates } from './Templates.jsx';
@@ -109,35 +109,58 @@ function AccountsGrid({ accounts, records }) {
   const nav = useNav();
   const view = s.settings.view;
   const bal = (a) => accountBalance(a, records);
+  const rubOf = (items) => items.reduce((x, a) => x + toRub(bal(a), a.currency), 0);
   const sections = accountSections(accounts, s.settings.me).filter((sec) => view === 'all' || sec.key === view || sec.key === 'shared');
   return (
     <>
       {sections.map((sec) => {
-        const groups = {};
-        const singles = [];
-        for (const a of sec.items) (a.group ? (groups[a.group] ||= []) : singles).push(a);
-        const sum = sec.items.reduce((x, a) => x + toRub(bal(a), a.currency), 0);
+        // Tiles in the saved order; accounts with the same "Объединить в" become one folder tile, placed where its first card is.
+        const tiles = [];
+        const folders = {};
+        for (const a of sec.items) {
+          if (!a.group) { tiles.push({ a }); continue; }
+          if (!folders[a.group]) { folders[a.group] = []; tiles.push({ folder: a.group, items: folders[a.group] }); }
+          folders[a.group].push(a);
+        }
         return (
           <div key={sec.key} style={{ display: 'grid', gap: 'var(--s3)' }}>
-            <div class="acc-section"><span style={{ color: sec.color }}>●</span>{sec.title}<b class="num">{rub(sum)}</b></div>
+            <div class="acc-section"><span style={{ color: sec.color }}>●</span>{sec.title}<b class="num">{rub(rubOf(sec.items))}</b></div>
             <div class="acc-grid">
-              {Object.entries(groups).map(([name, items]) => (
-                <button key={name} class="acc wide" onClick={() => nav.push(Records, { accountId: items.map((a) => a.id), title: name })}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span class="badge-ico" style={{ background: items[0].color, marginBottom: 0 }} aria-hidden="true">🐷</span>
-                    <span class="acc-name" style={{ flex: 1 }}>{name}</span>
-                    <span class="acc-sub num">≈ {rub(items.reduce((x, a) => x + toRub(bal(a), a.currency), 0))}</span>
-                  </span>
-                  <span class="pillow-lines num">{items.map((a) => <span key={a.id}>{fmt(bal(a), a.currency)}</span>)}</span>
-                </button>
-              ))}
-              {singles.map((a) => (
-                <button key={a.id} class="acc" onClick={() => nav.push(Records, { accountId: a.id, title: accLabel(a) })}>
-                  <span class="badge-ico" style={{ background: a.color }} aria-hidden="true">{ACC_ICON[a.kind] || '💳'}</span>
-                  <span class="acc-name">{a.name}</span>
-                  <span class="acc-bal num">{fmt(bal(a), a.currency)}</span>
-                </button>
-              ))}
+              {tiles.map((t) => {
+                if (t.a) {
+                  const a = t.a;
+                  return (
+                    <button key={a.id} class="acc" onClick={() => nav.push(Records, { accountId: a.id, title: accLabel(a) })}>
+                      <span class="badge-ico" style={{ background: a.color }} aria-hidden="true">{ACC_ICON[a.kind] || '💳'}</span>
+                      <span class="acc-name">{a.name}</span>
+                      <span class="acc-bal num">{fmt(bal(a), a.currency)}</span>
+                    </button>
+                  );
+                }
+                const items = t.items;
+                const multi = new Set(items.map((a) => a.currency || 'RUB')).size > 1;
+                const open = () => nav.push(AccountFolder, { group: t.folder, owner: sec.key === 'shared' ? '' : sec.key });
+                if (multi) {
+                  return (
+                    <button key={'f' + t.folder} class="acc wide" onClick={open}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span class="badge-ico" style={{ background: items[0].color, marginBottom: 0 }} aria-hidden="true">{items[0].kind === 'savings' ? '🐷' : '🗂️'}</span>
+                        <span class="acc-name" style={{ flex: 1 }}>{t.folder}</span>
+                        <span class="acc-sub num">≈ {rub(rubOf(items))}</span>
+                      </span>
+                      <span class="pillow-lines num">{items.map((a) => <span key={a.id}>{fmt(bal(a), a.currency)}</span>)}</span>
+                    </button>
+                  );
+                }
+                return (
+                  <button key={'f' + t.folder} class="acc folder" onClick={open}>
+                    <span class="badge-ico" style={{ background: items[0].color }} aria-hidden="true">🗂️</span>
+                    <span class="acc-name">{t.folder}</span>
+                    <span class="acc-bal num">{fmt(rubOf(items), items[0].currency)}</span>
+                    <span class="acc-sub">{items.length} {items.length < 5 ? 'карты' : 'карт'} ›</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         );

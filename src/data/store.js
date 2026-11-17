@@ -45,7 +45,6 @@ const defaultSettings = () => ({
   hidePromo: false,
   filter: { accounts: [], cats: [], labels: [] },
   rates: { USD: 0, EUR: 0, at: 0, manual: false }, // rubles per unit
-  receiptToken: '', receiptModel: 'openai/gpt-4.1-mini', // GitHub Models, for receipts
 });
 
 const load = (key, fallback) => {
