@@ -5,7 +5,7 @@ import { Donut, Area, Bar } from './charts.jsx';
 import { useStore, alive, visibleRecords, visibleAccounts, accountBalance, updateSettings, toRub, PEOPLE } from '../data/store.js';
 import { periodRange, totals, byCategory, byOwner, balanceSeries } from '../data/periods.js';
 import { GROUPS, group, category } from '../data/categories.js';
-import { rub, fmt } from '../data/format.js';
+import { rub, fmt, plural } from '../data/format.js';
 import { Records } from './Records.jsx';
 import { Reports } from './Reports.jsx';
 import { Scheduled, Budgets, budgetSpent } from './Planning.jsx';
@@ -157,7 +157,7 @@ function AccountsGrid({ accounts, records }) {
                     <span class="badge-ico" style={{ background: items[0].color }} aria-hidden="true">🗂️</span>
                     <span class="acc-name">{t.folder}</span>
                     <span class="acc-bal num">{fmt(rubOf(items), items[0].currency)}</span>
-                    <span class="acc-sub">{items.length} {items.length < 5 ? 'карты' : 'карт'} ›</span>
+                    <span class="acc-sub">{items.length} {plural(items.length, 'карта', 'карты', 'карт')} ›</span>
                   </button>
                 );
               })}
