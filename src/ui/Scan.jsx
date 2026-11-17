@@ -8,6 +8,7 @@ import { readScreenshots } from '../ai/ocr.js';
 import { parseBankText, categoryMemory } from '../ai/parse.js';
 import { CategoryPicker, defaultAccount } from './RecordForm.jsx';
 import { AccountOptions } from './Accounts.jsx';
+import { Receipt } from './Receipt.jsx';
 
 /** Screenshot or pasted text → reviewed list → records. Everything runs on the phone, for free. */
 export function Scan() {
@@ -72,6 +73,7 @@ export function Scan() {
 
   const edit = (i, patch) => setItems(items.map((x, j) => (j === i ? { ...x, ...patch } : x)));
 
+  if (mode === 'receipt') return <Receipt onSwitch={setMode} />;
   if (picking !== null) {
     const it = items[picking];
     return <CategoryPicker type={it.type === 'income' ? 'income' : 'expense'} onClose={() => setPicking(null)}
@@ -94,7 +96,7 @@ export function Scan() {
       {stage === 'pick' && (
         <>
           <div style={{ padding: '0 var(--s4) var(--s3)' }}>
-            <Segmented light options={[['photo', 'Скриншот'], ['text', 'Вставить текст']]} value={mode} onChange={setMode} />
+            <Segmented light options={[['photo', 'Скриншот'], ['text', 'Вставить текст'], ['receipt', 'Чек / заказ']]} value={mode} onChange={setMode} />
           </div>
           {mode === 'photo' ? (
             <>

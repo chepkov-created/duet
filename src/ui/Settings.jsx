@@ -5,6 +5,7 @@ import { useStore, updateSettings, syncNow, syncConfigured, PEOPLE, getState, re
 import { Accounts } from './Accounts.jsx';
 import { Categories } from './Categories.jsx';
 import { checkAccess } from '../data/github.js';
+import { checkModelsToken, ReceiptError, RECEIPT_MODELS } from '../ai/receipt.js';
 
 export function Onboarding() {
   return (
@@ -127,6 +128,8 @@ export function Settings() {
         <Row label={<span class="accent">Взять курс ЦБ сейчас</span>} chevron={false} onClick={() => refreshRates(true)} value={st.rates?.manual ? 'сейчас вручную' : st.rates?.at ? `ЦБ, ${new Date(st.rates.at).toLocaleDateString('ru-RU')}` : ''} />
       </div>
 
+      <ReceiptSettings />
+
       <div class="group-label">Данные</div>
       <div class="list inset plain">
         <Row label={<span class="accent">Скачать резервную копию</span>} chevron={false} onClick={exportJson} />
@@ -150,5 +153,35 @@ export function About() {
         <p>Версия 1.0</p>
       </div>
     </Screen>
+  );
+}
+
+function ReceiptSettings() {
+  const s = useStore();
+  const st = s.settings;
+  const [tok, setTok] = useState(st.receiptToken || '');
+  const [check, setCheck] = useState(null);
+  const test = async () => {
+    updateSettings({ receiptToken: tok });
+    setCheck({ busy: true });
+    try { await checkModelsToken(tok, st.receiptModel || 'openai/gpt-4.1-mini'); setCheck({ ok: 'Работает: GitHub Models отвечает прямо с этого телефона.' }); }
+    catch (e) { setCheck({ err: e instanceof ReceiptError ? e.message : 'GitHub Models недоступен из браузера (' + (e.message || e) + ').' }); }
+  };
+  return (
+    <>
+      <div class="group-label">Чеки и заказы → позиции (бесплатно, GitHub Models)</div>
+      <div class="list inset plain">
+        <label class="row"><span class="rl">Токен</span><input type="password" value={tok} placeholder="github_pat_…" autoComplete="off" onInput={(e) => setTok(e.currentTarget.value.trim())} onBlur={() => updateSettings({ receiptToken: tok })} /></label>
+        <label class="row"><span class="rl">Модель</span>
+          <select value={st.receiptModel || 'openai/gpt-4.1-mini'} onChange={(e) => updateSettings({ receiptModel: e.currentTarget.value })}>
+            {RECEIPT_MODELS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </select>
+        </label>
+        <Row label={<span class="accent">{check?.busy ? 'Проверяю…' : 'Проверить'}</span>} chevron={false} onClick={tok ? test : undefined} />
+      </div>
+      {check?.ok && <div class="note-box" style={{ color: 'var(--pos-text)' }}>✓ {check.ok}</div>}
+      {check?.err && <div class="error-box" role="alert">{check.err}</div>}
+      <div class="note-box">Токен: GitHub → Settings → Developer settings → Fine-grained tokens → Generate new token → Permissions → <b>Models: Read-only</b>. Можно отдельный токен или добавить это право к токену синхронизации. Бесплатно, примерно 150 чеков в день. Фото отправляется в GitHub только при нажатии «Распознать».</div>
+    </>
   );
 }
