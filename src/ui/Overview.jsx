@@ -32,6 +32,7 @@ export function Overview() {
       left={<SyncChip onClick={() => nav.push(SyncScreen, { pushed: true })} />}
       right={
         <>
+          <button class="icon-btn" aria-label="Поиск по записям" style={{ color: 'var(--accent)', fontSize: 20 }} onClick={() => nav.push(Records, { title: 'Поиск', initialQuery: '', everything: true })}>🔍</button>
           <FilterButton />
           <button class="icon-btn" aria-label="Распознать скриншот" onClick={nav.scan} style={{ color: 'var(--accent)' }}><Svg.camera /></button>
         </>

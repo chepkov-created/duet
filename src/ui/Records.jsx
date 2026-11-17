@@ -2,16 +2,37 @@ import { useState } from 'preact/hooks';
 import { useNav } from './App.jsx';
 import { Screen, RecordRow, Empty } from './kit.jsx';
 import { useStore, alive, visibleRecords, inRub } from '../data/store.js';
-import { category } from '../data/categories.js';
+import { category, groupOf } from '../data/categories.js';
 import { dayLabel, fmt, dayStart } from '../data/format.js';
 import { effectOn } from '../data/store.js';
 import { PersonSwitch } from './Overview.jsx';
 import { FilterBar, FilterButton } from './Filter.jsx';
 
-export function Records({ accountId, categoryIds, title = 'Записи', range, back = 'Назад', owner }) {
+const norm = (s) => String(s || '').toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ').trim();
+const TYPE_WORDS = { expense: 'расход трата', income: 'доход поступление', transfer: 'перевод' };
+const MONTHS = ['январь января', 'февраль февраля', 'март марта', 'апрель апреля', 'май мая', 'июнь июня', 'июль июля', 'август августа', 'сентябрь сентября', 'октябрь октября', 'ноябрь ноября', 'декабрь декабря'];
+
+/** Everything a record can be found by: note, payee, labels, category and its group, account, person, type, date, amount in several spellings. */
+function searchText(r, accounts) {
+  const c = category(r.categoryId);
+  const acc = (id) => accounts.find((a) => a.id === id);
+  const d = new Date(r.date);
+  const a = r.orig ? r.orig.amount : r.amount;
+  const whole = Math.trunc(a);
+  return norm([
+    r.note, r.payee, ...(r.labels || []), r.owner,
+    r.categoryId ? c.name : '', r.categoryId ? groupOf(r.categoryId)?.name : '',
+    acc(r.accountId)?.name, acc(r.toAccountId)?.name, TYPE_WORDS[r.type],
+    `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`, `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`,
+    String(a), String(a).replace('.', ','), a.toFixed(2), a.toFixed(2).replace('.', ','), String(whole), whole.toLocaleString('ru-RU').replace(/\s/g, ' '), r.source,
+  ].filter(Boolean).join(' | '));
+}
+
+export function Records({ accountId, categoryIds, title = 'Записи', range, back = 'Назад', owner, initialQuery, everything }) {
   const s = useStore();
   const nav = useNav();
-  const [q, setQ] = useState('');
+  const [q, setQ] = useState(initialQuery || '');
+  const [limit, setLimit] = useState(200);
   const accounts = alive(s.ledger.accounts);
   const accIds = accountId ? [].concat(accountId) : null;
   const singleAcc = accIds?.length === 1 ? accounts.find((a) => a.id === accIds[0]) : null;
@@ -20,13 +41,19 @@ export function Records({ accountId, categoryIds, title = 'Записи', range,
     ? alive(s.ledger.records).filter((r) => accIds.includes(r.accountId) || accIds.includes(r.toAccountId)).map((r) => (singleAcc ? r : inRub(r, s)))
     : visibleRecords(s);
   if (owner) recs = visibleRecords({ ...s, settings: { ...s.settings, view: owner } });
+  // Global search: both people, no filters.
+  if (everything) recs = alive(s.ledger.records).map((r) => inRub(r, s));
   if (categoryIds) recs = recs.filter((r) => categoryIds.includes(r.categoryId));
   if (range) recs = recs.filter((r) => { const d = new Date(r.date); return d >= range.from && d <= range.to; });
-  const needle = q.trim().toLowerCase();
+  const needle = norm(q);
   if (needle) {
-    recs = recs.filter((r) => [category(r.categoryId).name, r.note, r.payee, r.owner, String(r.amount)].some((f) => f && String(f).toLowerCase().includes(needle)));
+    // Every word must be found somewhere in the record: "кофе арина" = coffee records of Arina.
+    const words = needle.split(' ');
+    recs = recs.filter((r) => { const hay = searchText(r, accounts); return words.every((w) => hay.includes(w)); });
   }
   recs = [...recs].sort((a, b) => new Date(b.date) - new Date(a.date));
+  const total = recs.length;
+  recs = recs.slice(0, limit);
   const days = [];
   for (const r of recs) {
     const key = dayStart(r.date).getTime();
@@ -34,14 +61,17 @@ export function Records({ accountId, categoryIds, title = 'Записи', range,
     days[days.length - 1].items.push(r);
   }
   return (
-    <Screen pushed title={title} back={back} onBack={nav.pop} right={<>{!accountId && <FilterButton />}<button class="link" onClick={() => nav.record(null, singleAcc ? { accountId: singleAcc.id } : undefined)}>Добавить</button></>}>
-      {!accountId && <div style={{ padding: '0 var(--s4) var(--s3)' }}><PersonSwitch /></div>}
-      {!accountId && <FilterBar />}
+    <Screen pushed title={title} back={back} onBack={nav.pop} right={<>{!accountId && !everything && <FilterButton />}<button class="link" onClick={() => nav.record(null, singleAcc ? { accountId: singleAcc.id } : undefined)}>Добавить</button></>}>
+      {!accountId && !everything && <div style={{ padding: '0 var(--s4) var(--s3)' }}><PersonSwitch /></div>}
+      {!accountId && !everything && <FilterBar />}
+      {everything && <div class="note-box">Ищет по всем записям — и Миши, и Арины, без фильтров.</div>}
       <label class="search">
         <span aria-hidden="true">🔍</span>
         <span class="sr-only">Поиск по записям</span>
-        <input type="search" placeholder="Поиск: категория, заметка, сумма" value={q} onInput={(e) => setQ(e.currentTarget.value)} />
+        <input type="search" placeholder="Заметка, магазин, категория, сумма, дата…" value={q} autoFocus={Boolean(initialQuery !== undefined)}
+          onInput={(e) => { setQ(e.currentTarget.value); setLimit(200); }} />
       </label>
+      {needle && total > 0 && <div class="note-box">Найдено: {total}</div>}
       {days.length === 0 && <Empty icon="🧾" text={needle ? 'Ничего не нашлось' : 'Записей нет'} />}
       {days.map((d) => {
         const sum = d.items.reduce((a, r) => a + (singleAcc ? effectOn(r, singleAcc.id) : r.type === 'income' ? r.amount : r.type === 'expense' ? -r.amount : 0), 0);
@@ -54,6 +84,9 @@ export function Records({ accountId, categoryIds, title = 'Записи', range,
           </section>
         );
       })}
+      {total > limit && (
+        <div style={{ padding: 'var(--s4)' }}><button class="btn" onClick={() => setLimit(limit + 300)}>Показать ещё ({total - limit})</button></div>
+      )}
     </Screen>
   );
 }
