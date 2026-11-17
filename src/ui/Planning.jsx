@@ -8,14 +8,18 @@ import { category, group, EXPENSE_GROUPS } from '../data/categories.js';
 import { rub, toLocalInput, addMonths, addDays } from '../data/format.js';
 import { periodRange, inRange } from '../data/periods.js';
 import { CategoryPicker } from './RecordForm.jsx';
+import { payScheduled, duePayments, myScheduled } from './Payments.jsx';
 
 export function Planning() {
   const nav = useNav();
+  const s = useStore();
+  const due = duePayments(s).length;
+  const count = myScheduled(s).length;
   return (
     <Screen title="Планы">
       <div class="stack">
         <button class="tile" onClick={() => nav.push(Scheduled, {})}>
-          <div class="tl"><div style={{ fontSize: 'var(--fs-xl)', fontWeight: 700 }}>Регулярные платежи</div><div class="muted" style={{ fontSize: 'var(--fs-m)', marginTop: 4 }}>Что придётся оплатить дальше</div></div>
+          <div class="tl"><div style={{ fontSize: 'var(--fs-xl)', fontWeight: 700 }}>Запланированные платежи{due > 0 && <span class="badge-dot inline">{due}</span>}</div><div class="muted" style={{ fontSize: 'var(--fs-m)', marginTop: 4 }}>Ваши будущие платежи{count ? ` · ${count}` : ''}</div></div>
           <div class="app-ico" style={{ width: 60, height: 60, borderRadius: 14, background: 'var(--warn)', display: 'grid', placeItems: 'center', fontSize: 30 }} aria-hidden="true">⏰</div>
         </button>
         <button class="tile" onClick={() => nav.push(Budgets, {})}>
@@ -37,39 +41,9 @@ export const nextDate = (iso, repeat) => {
   return null;
 };
 
-export function Scheduled() {
-  const s = useStore();
-  const nav = useNav();
-  const [edit, setEdit] = useState(undefined);
-  const accounts = alive(s.ledger.accounts);
-  const list = alive(s.ledger.scheduled)
-    .filter((x) => s.settings.view === 'all' || x.owner === s.settings.view)
-    .sort((a, b) => new Date(a.date) - new Date(b.date));
-  // Show upcoming occurrences for 3 months so monthly fees appear like a timeline.
-  const horizon = addMonths(new Date(), 3);
-  const occurrences = [];
-  for (const x of list) {
-    let d = x.date;
-    for (let i = 0; d && new Date(d) <= horizon && i < 12; i++) {
-      occurrences.push({ ...x, date: d, occ: i });
-      d = nextDate(d, x.repeat);
-    }
-  }
-  occurrences.sort((a, b) => new Date(a.date) - new Date(b.date));
-  return (
-    <Screen pushed title="Регулярные платежи" back="Планы" onBack={nav.pop} right={<button class="link" onClick={() => setEdit(null)}>Добавить</button>}>
-      {occurrences.length === 0 && <Empty icon="⏰" text="Нет регулярных платежей"><button class="link strong" onClick={() => setEdit(null)}>Добавить платёж</button></Empty>}
-      {occurrences.length > 0 && (
-        <div class="day-list" style={{ margin: '0 var(--s4)', borderRadius: 'var(--r-l)' }}>
-          {occurrences.map((x) => <RecordRow key={x.id + x.occ} r={x} accounts={accounts} scheduled onClick={() => setEdit(list.find((y) => y.id === x.id))} />)}
-        </div>
-      )}
-      {edit !== undefined && <ScheduledForm item={edit} onClose={() => setEdit(undefined)} />}
-    </Screen>
-  );
-}
+export { Scheduled } from './Payments.jsx';
 
-function ScheduledForm({ item, onClose }) {
+export function ScheduledForm({ item, onClose }) {
   const s = useStore();
   const accounts = alive(s.ledger.accounts);
   const [f, setF] = useState(item ? { ...item, amountText: String(item.amount) } : {
@@ -82,14 +56,7 @@ function ScheduledForm({ item, onClose }) {
   const valid = amount > 0 && f.categoryId && f.accountId;
   const toItem = () => { const { amountText, occ, ...rest } = f; return { ...rest, amount, name: f.name.trim() || category(f.categoryId).name }; };
   const save = () => { if (!valid) return; upsert('scheduled', toItem()); onClose(); };
-  const payNow = () => {
-    if (!valid) return;
-    const it = toItem();
-    upsert('records', { type: it.type, amount, accountId: it.accountId, categoryId: it.categoryId, owner: it.owner, date: new Date().toISOString(), note: it.name, status: 'done', payment: 'Карта' });
-    const nd = nextDate(it.date, it.repeat);
-    if (nd) upsert('scheduled', { ...it, date: nd }); else if (it.id) remove('scheduled', it.id);
-    onClose();
-  };
+  const payNow = () => { if (!valid) return; payScheduled(toItem()); onClose(); };
   if (pick) return <CategoryPicker type={f.type} onPick={(id) => { upd({ categoryId: id }); setPick(false); }} onClose={() => setPick(false)} />;
   return (
     <Sheet title={item ? 'Платёж' : 'Новый платёж'} onClose={onClose} right={<button class="link strong" onClick={save} disabled={!valid}>Готово</button>}

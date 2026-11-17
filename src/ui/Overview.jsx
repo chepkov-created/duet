@@ -13,6 +13,7 @@ import { AccountForm, AddAccount, Accounts, AccountFolder, accountSections, accL
 import { SyncScreen } from './Settings.jsx';
 import { SyncChip } from './More.jsx';
 import { QuickTemplates } from './Templates.jsx';
+import { BellButton, PayRow, PaymentDetail, myScheduled } from './Payments.jsx';
 import { ExpenseExplorer, ExpensesScreen, BalanceScreen, CashFlowScreen } from './Analytics.jsx';
 import { FilterBar, FilterButton } from './Filter.jsx';
 
@@ -33,6 +34,7 @@ export function Overview() {
       left={<SyncChip onClick={() => nav.push(SyncScreen, { pushed: true })} />}
       right={
         <>
+          <BellButton />
           <button class="icon-btn" aria-label="Поиск по записям" style={{ color: 'var(--accent)', fontSize: 20 }} onClick={() => nav.push(Records, { title: 'Поиск', initialQuery: '', everything: true })}>🔍</button>
           <FilterButton />
           <button class="icon-btn" aria-label="Распознать скриншот" onClick={nav.scan} style={{ color: 'var(--accent)' }}><Svg.camera /></button>
@@ -241,11 +243,7 @@ function BudgetsPreview({ budgets, recs }) {
 function ScheduledPreview() {
   const s = useStore();
   const nav = useNav();
-  const accounts = alive(s.ledger.accounts);
-  const list = alive(s.ledger.scheduled)
-    .filter((x) => s.settings.view === 'all' || x.owner === s.settings.view)
-    .sort((a, b) => new Date(a.date) - new Date(b.date))
-    .slice(0, 3);
+  const list = myScheduled(s).sort((a, b) => new Date(a.date) - new Date(b.date)).slice(0, 3);
   if (!list.length) return <Empty icon="⏰" text="Будущих платежей нет" />;
-  return list.map((x) => <RecordRow key={x.id} r={x} accounts={accounts} scheduled onClick={() => nav.push(Scheduled, { pushed: true })} />);
+  return <div class="list" style={{ margin: '0 calc(-1 * var(--s5))', background: 'transparent' }}>{list.map((x) => <PayRow key={x.id} x={x} onClick={() => nav.push(PaymentDetail, { id: x.id })} />)}</div>;
 }

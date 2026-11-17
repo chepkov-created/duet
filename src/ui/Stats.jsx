@@ -12,6 +12,7 @@ import { Scheduled } from './Planning.jsx';
 import { PersonSwitch } from './Overview.jsx';
 import { FilterBar, FilterButton } from './Filter.jsx';
 import { BalanceScreen, ExpensesScreen, CashFlowScreen } from './Analytics.jsx';
+import { Forecast } from './Payments.jsx';
 
 export function Stats() {
   const s = useStore();
@@ -46,7 +47,7 @@ export function Stats() {
             <div class="bar" style={{ height: 14, borderRadius: 2 }}><div style={{ width: `${(t.expense / max) * 100}%`, background: 'var(--neg)', borderRadius: 2 }} /></div>
           </div>
         </Tile>
-        <Tile label="Платежи на 30 дней" value={rub(forecast)} onClick={() => nav.push(Scheduled, {})}>
+        <Tile label="Прогноз" value={rub(forecast)} onClick={() => nav.push(Forecast, {})}>
           <div style={{ width: 3, height: 56, background: 'var(--cat-teal)', borderRadius: 2 }} />
         </Tile>
         <button class="tile" onClick={open}>

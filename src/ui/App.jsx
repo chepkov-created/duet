@@ -9,6 +9,7 @@ import { More } from './More.jsx';
 import { RecordForm } from './RecordForm.jsx';
 import { Scan } from './Scan.jsx';
 import { Onboarding } from './Settings.jsx';
+import { duePayments } from './Payments.jsx';
 
 const Nav = createContext(null);
 export const useNav = () => useContext(Nav);
@@ -63,7 +64,7 @@ export function App() {
       {!top && (
         <nav class="tabbar" aria-label="Разделы">
           <TabBtn id="overview" cur={tab} set={nav.tab} label="Обзор" Icon={Svg.home} />
-          <TabBtn id="planning" cur={tab} set={nav.tab} label="Планы" Icon={Svg.clock} />
+          <TabBtn id="planning" cur={tab} set={nav.tab} label="Планы" Icon={Svg.clock} badge={duePayments(s).length} />
           <button class="fab" aria-label="Добавить запись" onClick={() => nav.record(null)}><Svg.plus /></button>
           <TabBtn id="stats" cur={tab} set={nav.tab} label="Статистика" Icon={Svg.bars} />
           <TabBtn id="more" cur={tab} set={nav.tab} label="Ещё" Icon={Svg.more} />
@@ -80,9 +81,9 @@ export function App() {
   );
 }
 
-const TabBtn = ({ id, cur, set, label, Icon }) => (
-  <button class={`tab${cur === id ? ' active' : ''}`} aria-current={cur === id ? 'page' : undefined} onClick={() => set(id)}>
-    <Icon />
+const TabBtn = ({ id, cur, set, label, Icon, badge }) => (
+  <button class={`tab${cur === id ? ' active' : ''}`} aria-current={cur === id ? 'page' : undefined} onClick={() => set(id)} style={{ position: 'relative' }}>
+    <Icon />{badge > 0 && <span class="badge-dot tab-badge">{badge}</span>}
     <span>{label}</span>
   </button>
 );
