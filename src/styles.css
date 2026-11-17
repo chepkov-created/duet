@@ -353,3 +353,16 @@ input, select, textarea { font: inherit; color: inherit; }
 .acc.folder .acc-sub { color: var(--text-2); font-size: var(--fs-xs); }
 .order-btn { width: 36px; height: 36px; border-radius: var(--r-s); background: var(--surface-2); color: var(--accent); font-size: var(--fs-l); margin-left: 6px; }
 .order-btn:disabled { opacity: 0.3; }
+.sheet.short .sheet-body { padding-bottom: calc(var(--s4) + var(--safe-b)); }
+
+/* period dock: handle, swipe, larger dots, expandable rows */
+.period-dock { touch-action: pan-y; padding-bottom: var(--s3); }
+.grab-btn { display: block; width: 100%; padding: 4px 0 8px; margin-top: -4px; }
+.grab-btn .grab { margin: 0 auto; display: block; }
+.pager { gap: 4px; margin-top: 6px; }
+.pager button { width: 28px; height: 22px; background: none; display: grid; place-items: center; border-radius: var(--r-s); }
+.pager button i { width: 9px; height: 9px; border-radius: var(--r-pill); background: var(--surface-3); display: block; }
+.pager button.on i { background: var(--accent); }
+.dock-more { margin: var(--s2) calc(-1 * var(--s4)) 0; border-top: 1px solid var(--line); }
+.dock-more .row { min-height: 50px; }
+.pager button.on { background: none; }

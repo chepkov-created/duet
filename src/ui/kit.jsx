@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { createPortal } from 'preact/compat';
 import { category } from '../data/categories.js';
 import { rub, fmt, dayLabel, inDays } from '../data/format.js';
 
@@ -72,7 +73,8 @@ export function Sheet({ title, onClose, left, right, children, footer, short }) 
     document.body.style.overflow = 'hidden';
     return () => { window.removeEventListener('keydown', onKey); document.body.style.overflow = ''; };
   }, []);
-  return (
+  // Rendered into <body> so no panel (period dock, tab bar) can cover it.
+  return createPortal((
     <div class="sheet-wrap" onClick={(e) => e.target === e.currentTarget && onClose?.()}>
       <div class={`sheet${short ? ' short' : ''}`} role="dialog" aria-modal="true" aria-label={title}>
         <div class="sheet-head">
@@ -84,7 +86,7 @@ export function Sheet({ title, onClose, left, right, children, footer, short }) 
         {footer && <div class="sheet-foot">{footer}</div>}
       </div>
     </div>
-  );
+  ), document.body);
 }
 
 export const Segmented = ({ options, value, onChange, light }) => (

@@ -1,6 +1,8 @@
-import { useState } from 'preact/hooks';
+import { useRef, useState } from 'preact/hooks';
 import { Sheet, Row } from './kit.jsx';
-import { useStore, updateSettings } from '../data/store.js';
+import { useStore, updateSettings, alive, filterCount } from '../data/store.js';
+import { FilterSheet } from './Filter.jsx';
+import { accLabel } from './Accounts.jsx';
 import { ROLLING, CAL_UNITS, periodRange } from '../data/periods.js';
 import { dayStart, addDays } from '../data/format.js';
 
@@ -19,9 +21,28 @@ export function PeriodDock({ bottom = 'calc(var(--tabbar-h) + var(--safe-b))' })
   const pageOf = p.kind === 'rolling' ? 0 : p.kind === 'cal' ? 1 : 2;
   const [page, setPage] = useState(pageOf);
   const [units, setUnits] = useState(false);
+  const [open, setOpen] = useState(false);      // expanded: accounts + filter rows
+  const [filterOpen, setFilterOpen] = useState(false);
+  const s = useStore();
+  const f = s.settings.filter || {};
+  const accounts = alive(s.ledger.accounts);
+  const accValue = !f.accounts?.length ? 'Все' : f.accounts.length === 1 ? accLabel(accounts.find((a) => a.id === f.accounts[0])) : `${f.accounts.length} счёта`;
+  const otherCount = filterCount(f) - (f.accounts?.length || 0);
+
+  // Swipe left/right on the panel switches the three pages; drag the handle up/down to open/close.
+  const touch = useRef(null);
+  const onStart = (e) => { const t = e.touches[0]; touch.current = { x: t.clientX, y: t.clientY }; };
+  const onEnd = (e) => {
+    if (!touch.current) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - touch.current.x, dy = t.clientY - touch.current.y;
+    touch.current = null;
+    if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.5) setPage((pg) => Math.max(0, Math.min(2, pg + (dx < 0 ? 1 : -1))));
+    else if (Math.abs(dy) > 30 && Math.abs(dy) > Math.abs(dx)) setOpen(dy < 0);
+  };
   return (
-    <div class="period-dock" style={{ bottom }}>
-      <div class="grab" aria-hidden="true" />
+    <div class={`period-dock${open ? ' open' : ''}`} style={{ bottom }} onTouchStart={onStart} onTouchEnd={onEnd}>
+      <button class="grab-btn" aria-label={open ? 'Свернуть' : 'Счета и фильтр'} aria-expanded={open} onClick={() => setOpen(!open)}><span class="grab" /></button>
       {page === 0 && (
         <div class="seg" role="tablist" aria-label="Период">
           {ROLLING.map(([k, l]) => (
@@ -49,9 +70,16 @@ export function PeriodDock({ bottom = 'calc(var(--tabbar-h) + var(--safe-b))' })
       )}
       <div class="pager" role="tablist" aria-label="Способ выбора периода">
         {['Скользящий период', 'Календарный период', 'Свои даты'].map((l, i) => (
-          <button key={i} aria-label={l} class={page === i ? 'on' : ''} onClick={() => setPage(i)} />
+          <button key={i} aria-label={l} class={page === i ? 'on' : ''} onClick={() => setPage(i)}><i /></button>
         ))}
       </div>
+      {open && (
+        <div class="dock-more">
+          <Row label="Счета" value={accValue} onClick={() => setFilterOpen(true)} />
+          <Row label="Фильтр" value={otherCount ? `${otherCount} условий` : 'Нет'} onClick={() => setFilterOpen(true)} />
+        </div>
+      )}
+      {filterOpen && <FilterSheet onClose={() => setFilterOpen(false)} />}
       {units && (
         <Sheet short title="Период" onClose={() => setUnits(false)}>
           <div class="list option-list">
