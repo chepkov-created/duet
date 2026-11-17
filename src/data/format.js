@@ -2,6 +2,7 @@ const money = new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 2, maximum
 
 /** 12 345,67 ₽ ; signed adds an explicit minus for negatives only */
 export const rub = (n, { sign = false, cur = true } = {}) => {
+  n = Math.round((n || 0) * 100) / 100 || 0; // no "-0,00" from float leftovers
   const v = money.format(Math.abs(n || 0)).replace(/ /g, ' ');
   const s = (n < 0 ? '-' : sign && n > 0 ? '+' : '') + v;
   return cur ? `${s} ₽` : s;
