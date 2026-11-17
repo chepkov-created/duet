@@ -134,6 +134,7 @@ export function RecordRow({ r, accounts, onClick, scheduled }) {
         <span class={`amt num ${sign < 0 ? 'neg' : sign > 0 ? 'pos' : ''}`}>{shown}{toShown}</span>
         <span class="muted">{scheduled ? inDays(r.date) : dayLabel(r.date)}</span>
         {(scheduled || r.status === 'planned') && <span class="pill warn">Запланировано</span>}
+        {r.secretFrom && <span class="muted" title={`Секрет от ${r.secretFrom}`}>🤫 секрет</span>}
       </div>
     </button>
   );

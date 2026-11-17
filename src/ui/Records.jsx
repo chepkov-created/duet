@@ -1,7 +1,7 @@
 import { useState } from 'preact/hooks';
 import { useNav } from './App.jsx';
 import { Screen, RecordRow, Empty } from './kit.jsx';
-import { useStore, alive, visibleRecords, inRub } from '../data/store.js';
+import { useStore, alive, visibleRecords, inRub, hiddenFromMe } from '../data/store.js';
 import { category, groupOf } from '../data/categories.js';
 import { dayLabel, fmt, dayStart } from '../data/format.js';
 import { effectOn } from '../data/store.js';
@@ -38,7 +38,7 @@ export function Records({ accountId, categoryIds, title = 'Записи', range,
   const singleAcc = accIds?.length === 1 ? accounts.find((a) => a.id === accIds[0]) : null;
   // One account: amounts in its own currency. Several or none: everything in rubles.
   let recs = accIds
-    ? alive(s.ledger.records).filter((r) => accIds.includes(r.accountId) || accIds.includes(r.toAccountId)).map((r) => (singleAcc ? r : inRub(r, s)))
+    ? alive(s.ledger.records).filter((r) => !hiddenFromMe(r, s)).filter((r) => accIds.includes(r.accountId) || accIds.includes(r.toAccountId)).map((r) => (singleAcc ? r : inRub(r, s)))
     : visibleRecords(s);
   if (owner) recs = visibleRecords({ ...s, settings: { ...s.settings, view: owner } });
   // Search: whoever the switch shows (yourself by default), without category/account filters.

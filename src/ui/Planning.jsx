@@ -2,7 +2,7 @@ import { useState } from 'preact/hooks';
 import { useNav } from './App.jsx';
 import { Screen, RecordRow, Empty, Row, Sheet, Segmented, CatIcon, PERSON_COLOR } from './kit.jsx';
 import { Bar } from './charts.jsx';
-import { useStore, alive, upsert, remove, inRub, PEOPLE } from '../data/store.js';
+import { useStore, alive, upsert, remove, inRub, hiddenFromMe, PEOPLE } from '../data/store.js';
 import { AccountOptions } from './Accounts.jsx';
 import { category, group, EXPENSE_GROUPS } from '../data/categories.js';
 import { rub, toLocalInput, addMonths, addDays } from '../data/format.js';
@@ -120,7 +120,7 @@ export function Budgets() {
   const nav = useNav();
   const [edit, setEdit] = useState(undefined);
   const list = alive(s.ledger.budgets);
-  const recs = alive(s.ledger.records).map((r) => inRub(r, s));
+  const recs = alive(s.ledger.records).filter((r) => !hiddenFromMe(r, s)).map((r) => inRub(r, s));
   return (
     <Screen pushed title="Бюджеты" back="Планы" onBack={nav.pop} right={<button class="link" onClick={() => setEdit(null)}>Добавить</button>}>
       {list.length === 0 && <Empty icon="💰" text="Активных бюджетов нет"><button class="link strong" onClick={() => setEdit(null)}>Создать бюджет</button></Empty>}

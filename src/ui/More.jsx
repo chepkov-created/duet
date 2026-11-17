@@ -6,6 +6,7 @@ import { Accounts } from './Accounts.jsx';
 import { Settings, SyncScreen, About } from './Settings.jsx';
 import { Reports } from './Reports.jsx';
 import { TemplatesScreen } from './Templates.jsx';
+import { Categories } from './Categories.jsx';
 
 export function SyncChip({ onClick }) {
   const s = useStore();
@@ -20,6 +21,7 @@ export function More() {
   const items = [
     ['📸', 'var(--fab)', 'Скриншот → записи', nav.scan],
     ['⚡', 'var(--warn)', 'Шаблоны', () => nav.push(TemplatesScreen, {}), `${(s.ledger.templates || []).filter((t) => !t.deleted).length} шт.`],
+    ['🏷️', 'var(--cat-pink)', 'Категории', () => nav.push(Categories, {})],
     ['☰', 'var(--fab)', 'Записи', () => nav.push(Records, {})],
     ['🏛️', 'var(--acc-blue)', 'Счета', () => nav.push(Accounts, {})],
     ['📊', 'var(--premium)', 'Отчёты', () => nav.push(Reports, {})],

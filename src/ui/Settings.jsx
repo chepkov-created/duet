@@ -3,6 +3,7 @@ import { useNav } from './App.jsx';
 import { Screen, Row, PERSON_COLOR } from './kit.jsx';
 import { useStore, updateSettings, syncNow, syncConfigured, PEOPLE, getState, replaceLedger, loadDemo, wipeLocal, mergeLedgers, refreshRates } from '../data/store.js';
 import { Accounts } from './Accounts.jsx';
+import { Categories } from './Categories.jsx';
 import { checkAccess } from '../data/github.js';
 
 export function Onboarding() {
@@ -111,6 +112,7 @@ export function Settings() {
 
       <div class="list inset plain" style={{ marginTop: 'var(--s3)' }}>
         <Row label="Счета" onClick={() => nav.push(Accounts, {})} />
+        <Row label="Категории" onClick={() => nav.push(Categories, {})} />
       </div>
 
       <div class="group-label">Курсы валют (для пересчёта в рубли)</div>

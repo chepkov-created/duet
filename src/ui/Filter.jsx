@@ -91,7 +91,7 @@ export function FilterSheet({ onClose }) {
       <div class="list">
         {GROUPS.map((g) => {
           const groupOn = f.cats.includes(g.id);
-          const subsOn = g.subs.filter((_, i) => f.cats.includes(`${g.id}.${i}`)).length;
+          const subsOn = g.cats.filter((c) => f.cats.includes(c.id)).length;
           return (
             <div key={g.id}>
               <div class="row" style={{ gap: 'var(--s3)' }}>
@@ -103,11 +103,10 @@ export function FilterSheet({ onClose }) {
                 </button>
                 <button class="chev" aria-label="Подкатегории" onClick={() => setOpenGroup(openGroup === g.id ? null : g.id)}>{openGroup === g.id ? '⌄' : '›'}</button>
               </div>
-              {openGroup === g.id && g.subs.map((name, i) => {
-                const id = `${g.id}.${i}`;
+              {openGroup === g.id && g.cats.map(({ id, name }) => {
                 const on = groupOn || f.cats.includes(id);
                 return (
-                  <CheckRow key={id} indent on={on} disabled={groupOn} label={i === 0 ? `${name} (общее)` : name}
+                  <CheckRow key={id} indent on={on} disabled={groupOn} label={id === `${g.id}.0` ? `${name} (общее)` : name}
                     onClick={() => !groupOn && setF({ ...f, cats: toggle(f.cats, id) })} />
                 );
               })}

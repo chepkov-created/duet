@@ -1,7 +1,9 @@
 // Category tree. Group ids are stable, sub ids are `${group}.${n}` and never renumbered.
 // The first sub of every group is the group itself ("general" bucket).
+// The family can rename, add and hide categories in the app: those edits live in the shared ledger
+// (collection `categories`) and are laid over this base tree by applyCategoryEdits().
 
-export const GROUPS = [
+const BASE = [
   {
     id: 'food', name: 'Еда и напитки', color: 'var(--cat-red)', icon: '🍅', type: 'expense',
     subs: ['Еда и напитки', 'Продукты', 'Рестораны, фастфуд', 'Напитки, бары'],
@@ -57,15 +59,55 @@ export const GROUPS = [
   },
 ];
 
-export const CATEGORIES = GROUPS.flatMap((g) =>
-  g.subs.map((name, i) => ({ id: `${g.id}.${i}`, name, group: g.id, color: g.color, icon: g.icon, type: g.type }))
-);
+export const BASE_CATEGORY_IDS = new Set(BASE.flatMap((g) => [g.id, ...g.subs.map((_, i) => `${g.id}.${i}`)]));
 
-const byId = Object.fromEntries(CATEGORIES.map((c) => [c.id, c]));
-const groupById = Object.fromEntries(GROUPS.map((g) => [g.id, g]));
+// Live bindings: rebuilt whenever the family edits categories, so every screen sees the new names.
+export let GROUPS = [];       // visible groups, each with .cats (visible subcategories)
+export let ALL_GROUPS = [];   // including hidden ones, for the categories editor
+export let CATEGORIES = [];   // every category, hidden ones too (old records still need their name)
+export let EXPENSE_GROUPS = [];
+export let INCOME_GROUPS = [];
+let byId = {};
+let groupById = {};
+
+/** @param {Array<{id:string, kind:'group'|'cat', name?:string, group?:string, type?:string, color?:string, icon?:string, hidden?:boolean}>} edits */
+export function applyCategoryEdits(edits = []) {
+  const ed = Object.fromEntries(edits.filter((e) => !e.deleted).map((e) => [e.id, e]));
+  const groups = BASE.map((g) => ({ id: g.id, name: g.name, color: g.color, icon: g.icon, type: g.type, custom: false,
+    cats: g.subs.map((name, i) => ({ id: `${g.id}.${i}`, name, custom: false })) }));
+  // new groups made in the app
+  for (const e of Object.values(ed)) {
+    if (e.kind === 'group' && !BASE_CATEGORY_IDS.has(e.id)) {
+      groups.push({ id: e.id, name: e.name, color: e.color || 'var(--cat-brown)', icon: e.icon || '📁', type: e.type || 'expense', custom: true,
+        cats: [{ id: `${e.id}.0`, name: e.name, custom: true }] });
+    }
+  }
+  const gmap = Object.fromEntries(groups.map((g) => [g.id, g]));
+  // new subcategories made in the app (sorted by creation, so the order is stable on both phones)
+  for (const e of Object.values(ed).filter((x) => x.kind === 'cat' && !BASE_CATEGORY_IDS.has(x.id)).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0))) {
+    if (gmap[e.group] && !gmap[e.group].cats.some((c) => c.id === e.id)) gmap[e.group].cats.push({ id: e.id, name: e.name, custom: true });
+  }
+  // renames, colours, hiding
+  for (const g of groups) {
+    const ge = ed[g.id];
+    if (ge) Object.assign(g, ge.name ? { name: ge.name } : {}, ge.color ? { color: ge.color } : {}, ge.icon ? { icon: ge.icon } : {}, { hidden: Boolean(ge.hidden) });
+    for (const c of g.cats) {
+      const ce = ed[c.id];
+      if (ce) Object.assign(c, ce.name ? { name: ce.name } : {}, { hidden: Boolean(ce.hidden) });
+      // the "general" sub follows the group name unless renamed on its own
+      if (c.id === `${g.id}.0` && !(ce && ce.name) && ge && ge.name) c.name = ge.name;
+    }
+  }
+  ALL_GROUPS = groups;
+  CATEGORIES = groups.flatMap((g) => g.cats.map((c) => ({ ...c, group: g.id, color: g.color, icon: g.icon, type: g.type, groupHidden: Boolean(g.hidden) })));
+  byId = Object.fromEntries(CATEGORIES.map((c) => [c.id, c]));
+  groupById = Object.fromEntries(groups.map((g) => [g.id, g]));
+  GROUPS = groups.filter((g) => !g.hidden).map((g) => ({ ...g, cats: g.cats.filter((c) => !c.hidden) }));
+  EXPENSE_GROUPS = GROUPS.filter((g) => g.type === 'expense');
+  INCOME_GROUPS = GROUPS.filter((g) => g.type === 'income');
+}
+applyCategoryEdits([]);
 
 export const category = (id) => byId[id] || { id, name: 'Без категории', group: 'other', color: 'var(--cat-brown)', icon: '❔', type: 'expense' };
 export const group = (id) => groupById[id];
 export const groupOf = (catId) => groupById[category(catId).group];
-export const EXPENSE_GROUPS = GROUPS.filter((g) => g.type === 'expense');
-export const INCOME_GROUPS = GROUPS.filter((g) => g.type === 'income');

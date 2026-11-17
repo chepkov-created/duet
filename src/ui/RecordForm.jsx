@@ -1,7 +1,7 @@
 import { useState } from 'preact/hooks';
 import { useNav } from './App.jsx';
 import { Sheet, Segmented, Row, CatIcon, PERSON_COLOR } from './kit.jsx';
-import { useStore, alive, upsert, remove, updateSettings, PEOPLE, CURRENCIES } from '../data/store.js';
+import { useStore, alive, upsert, remove, updateSettings, otherPerson, PEOPLE, CURRENCIES } from '../data/store.js';
 import { accountSections, accLabel } from './Accounts.jsx';
 import { TemplatePicker } from './Templates.jsx';
 import { category, EXPENSE_GROUPS, INCOME_GROUPS } from '../data/categories.js';
@@ -181,6 +181,15 @@ export function RecordForm({ record, defaults, template }) {
         <label class="row"><span class="ri" aria-hidden="true">✍️</span><span class="rl">Заметка</span><input value={f.note} placeholder="Необязательно" onInput={(e) => upd({ note: e.currentTarget.value })} maxLength={140} /></label>
         <label class="row"><span class="ri" aria-hidden="true">🏪</span><span class="rl">Получатель</span><input value={f.payee} placeholder="Магазин или человек" onInput={(e) => upd({ payee: e.currentTarget.value })} maxLength={80} /></label>
         <LabelsRow labels={f.labels || []} onChange={(labels) => upd({ labels })} />
+        {!isTpl && (
+          <button class="row" role="switch" aria-checked={Boolean(f.secretFrom)} onClick={() => upd({ secretFrom: f.secretFrom ? '' : otherPerson(s) })}>
+            <span class="ri" aria-hidden="true">🤫</span>
+            <span class="rl">Секрет от {f.secretFrom || otherPerson(s)}
+              <span class="muted" style={{ display: 'block', fontSize: 'var(--fs-xs)' }}>Для сюрпризов: {f.secretFrom || otherPerson(s)} не увидит эту запись</span>
+            </span>
+            <span class={`toggle${f.secretFrom ? ' on' : ''}`} aria-hidden="true" />
+          </button>
+        )}
         <label class="row"><span class="ri" aria-hidden="true">💳</span><span class="rl">Способ оплаты</span>
           <select value={f.payment} onChange={(e) => upd({ payment: e.currentTarget.value })}>{PAY.map((p) => <option key={p}>{p}</option>)}</select>
         </label>
@@ -231,9 +240,9 @@ export function CategoryPicker({ type, onPick, onClose }) {
               <span style={{ flex: 1 }}>{g.name}</span>
               <span class="chev" aria-hidden="true">{open === g.id || groups.length === 1 ? '⌄' : '›'}</span>
             </button>
-            {(open === g.id || groups.length === 1) && g.subs.map((name, i) => (
-              <button key={i} class="row" style={{ paddingLeft: 64 }} onClick={() => onPick(`${g.id}.${i}`)}>
-                <span class="rl">{i === 0 ? `${name} (общее)` : name}</span>
+            {(open === g.id || groups.length === 1) && g.cats.map(({ id, name }) => (
+              <button key={id} class="row" style={{ paddingLeft: 64 }} onClick={() => onPick(id)}>
+                <span class="rl">{id === `${g.id}.0` ? `${name} (общее)` : name}</span>
               </button>
             ))}
           </div>

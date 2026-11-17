@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'preact/hooks';
 import { readLedger, writeLedger } from './github.js';
 import { uid } from './format.js';
+import { applyCategoryEdits } from './categories.js';
 
 const LEDGER_KEY = 'duet.ledger';
 const SETTINGS_KEY = 'duet.settings';
-const COLLECTIONS = ['accounts', 'records', 'scheduled', 'budgets', 'templates'];
+// `categories` holds the family's renames/new/hidden categories; it syncs like everything else.
+const COLLECTIONS = ['accounts', 'records', 'scheduled', 'budgets', 'templates', 'categories'];
 
 export const PEOPLE = ['Миша', 'Арина'];
 
@@ -33,6 +35,7 @@ const emptyLedger = () => ({
   scheduled: [],
   budgets: [],
   templates: [],
+  categories: [],
 });
 
 const defaultSettings = () => ({
@@ -59,7 +62,13 @@ let state = {
 };
 const listeners = new Set();
 const emit = () => listeners.forEach((l) => l(state));
-const set = (patch) => { state = { ...state, ...patch }; emit(); };
+const set = (patch) => {
+  // Category edits from either phone: rebuild the tree before screens re-render.
+  if (patch.ledger && patch.ledger.categories !== state.ledger.categories) applyCategoryEdits(live(patch.ledger.categories || []));
+  state = { ...state, ...patch };
+  emit();
+};
+applyCategoryEdits((state.ledger.categories || []).filter((x) => !x.deleted));
 
 export const getState = () => state;
 export function useStore() {
@@ -224,8 +233,12 @@ export const inRub = (r, s = state) => {
   return cur === 'RUB' ? r : { ...r, amount: toRub(r.amount, cur, s), orig: { amount: r.amount, currency: cur } };
 };
 
+/** A surprise: the record is hidden from this person everywhere except account balances. */
+export const hiddenFromMe = (r, s = state) => Boolean(r.secretFrom && r.secretFrom === s.settings.me);
+export const otherPerson = (s = state) => PEOPLE.find((p) => p !== s.settings.me) || PEOPLE[1];
+
 export const visibleRecords = (s = state, { ignoreFilter = false } = {}) => {
-  let recs = live(s.ledger.records).map((r) => inRub(r, s));
+  let recs = live(s.ledger.records).filter((r) => !hiddenFromMe(r, s)).map((r) => inRub(r, s));
   if (s.settings.view !== 'all') recs = recs.filter((r) => r.owner === s.settings.view);
   if (!ignoreFilter && filterCount(s.settings.filter)) recs = recs.filter((r) => matchFilter(r, s.settings.filter));
   return recs;

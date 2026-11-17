@@ -129,8 +129,7 @@ export function GroupReport({ groupId }) {
     <Screen pushed title={g.name} back="Отчёты" onBack={nav.pop} right={<FilterButton />}>
       <FilterBar />
       <div class="rep">
-        {g.subs.map((name, i) => {
-          const id = `${g.id}.${i}`;
+        {g.cats.filter((c) => !c.hidden || cur.cats[c.id] || prev.cats[c.id]).map(({ id, name }) => {
           const v = cur.cats[id] || 0, pv = prev.cats[id] || 0;
           return (
             <button key={id} class="rep-row" disabled={!v} onClick={() => nav.push(Records, { title: name, categoryIds: [id], range, back: g.name })}>
