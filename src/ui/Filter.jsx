@@ -1,5 +1,5 @@
 import { useState } from 'preact/hooks';
-import { Sheet, CatIcon, PERSON_COLOR } from './kit.jsx';
+import { Sheet, CatIcon, Segmented, PERSON_COLOR } from './kit.jsx';
 import { useStore, alive, updateSettings, filterCount, allLabels, EMPTY_FILTER, PEOPLE } from '../data/store.js';
 import { GROUPS, category, group } from '../data/categories.js';
 import { accLabel, accountSections } from './Accounts.jsx';
@@ -29,6 +29,7 @@ export function FilterBar() {
   if (!filterCount(f)) return null;
   const accounts = alive(s.ledger.accounts);
   const chips = [
+    ...(f.type && f.type !== 'all' ? [['type', f.type, f.type === 'income' ? 'Только доходы' : 'Только расходы']] : []),
     ...f.accounts.map((id) => ['accounts', id, accLabel(accounts.find((a) => a.id === id))]),
     ...f.cats.map((id) => ['cats', id, id.includes('.') ? category(id).name : group(id)?.name]),
     ...f.labels.map((l) => ['labels', l, `#${l}`]),
@@ -38,7 +39,7 @@ export function FilterBar() {
       <button class="label-chip" onClick={() => setOpen(true)}>Фильтр:</button>
       {chips.map(([k, v, label]) => (
         <button key={k + v} class="label-chip on" aria-label={`Убрать: ${label}`}
-          onClick={() => updateSettings({ filter: { ...f, [k]: f[k].filter((x) => x !== v) } })}>{label} ✕</button>
+          onClick={() => updateSettings({ filter: { ...f, [k]: k === 'type' ? 'all' : f[k].filter((x) => x !== v) } })}>{label} ✕</button>
       ))}
       <button class="label-chip" style={{ color: 'var(--neg-text)' }} onClick={() => updateSettings({ filter: EMPTY_FILTER })}>Сбросить</button>
       {open && <FilterSheet onClose={() => setOpen(false)} />}
@@ -46,7 +47,8 @@ export function FilterBar() {
   );
 }
 
-export function FilterSheet({ onClose }) {
+/** section: 'all' (everything), 'accounts' (only accounts), 'cats' (income/expense + categories + labels) */
+export function FilterSheet({ onClose, section = 'all' }) {
   const s = useStore();
   const [f, setF] = useState({ ...EMPTY_FILTER, ...(s.settings.filter || {}) });
   const [view, setView] = useState(s.settings.view);
@@ -54,12 +56,21 @@ export function FilterSheet({ onClose }) {
   const accounts = alive(s.ledger.accounts);
   const labels = allLabels(s);
   const apply = () => { updateSettings({ filter: f, view }); onClose(); };
-  const n = f.accounts.length + f.cats.length + f.labels.length;
+  const n = filterCount(f);
+  const showAcc = section !== 'cats', showCats = section !== 'accounts', showWho = section === 'all';
+  const type = f.type || 'all';
+  const groups = GROUPS.filter((g) => type === 'all' || g.type === type);
+  const reset = () => {
+    if (section === 'accounts') setF({ ...f, accounts: [] });
+    else if (section === 'cats') setF({ ...f, cats: [], labels: [], type: 'all' });
+    else { setF(EMPTY_FILTER); setView('all'); }
+  };
 
   return (
-    <Sheet title="Фильтр" onClose={onClose}
-      right={<button class="link" onClick={() => { setF(EMPTY_FILTER); setView('all'); }}>Сбросить</button>}
+    <Sheet title={section === 'accounts' ? 'Счета' : section === 'cats' ? 'Категории' : 'Фильтр'} onClose={onClose}
+      right={<button class="link" onClick={reset}>Сбросить</button>}
       footer={<button class="btn primary" onClick={apply}>Показать{n || view !== 'all' ? ` · ${n + (view !== 'all' ? 1 : 0)}` : ''}</button>}>
+      {showWho && <>
       <div class="group-label">Чьи записи</div>
       <div style={{ padding: '0 var(--s4)' }}>
         <div class="who">
@@ -67,7 +78,9 @@ export function FilterSheet({ onClose }) {
           {PEOPLE.map((p) => <button key={p} class={view === p ? 'on' : ''} onClick={() => setView(p)}><span style={{ color: PERSON_COLOR[p] }}>●</span> {p}</button>)}
         </div>
       </div>
+      </>}
 
+      {showAcc && <>
       <div class="group-label">Счета {f.accounts.length ? `· ${f.accounts.length}` : '· все'}</div>
       {accountSections(accounts, s.settings.me).map((sec) => (
         <div key={sec.key}>
@@ -86,10 +99,17 @@ export function FilterSheet({ onClose }) {
           </div>
         </div>
       ))}
+      </>}
 
+      {showCats && <>
+      <div class="group-label">Что показывать</div>
+      <div style={{ padding: '0 var(--s4)' }}>
+        <Segmented options={[['all', 'Всё'], ['expense', 'Только расходы'], ['income', 'Только доходы']]} value={type}
+          onChange={(t) => setF({ ...f, type: t, cats: f.cats.filter((c) => t === 'all' || (group(c.split('.')[0])?.type === t)) })} />
+      </div>
       <div class="group-label">Категории {f.cats.length ? `· ${f.cats.length}` : '· все'}</div>
       <div class="list">
-        {GROUPS.map((g) => {
+        {groups.map((g) => {
           const groupOn = f.cats.includes(g.id);
           const subsOn = g.cats.filter((c) => f.cats.includes(c.id)).length;
           return (
@@ -123,6 +143,7 @@ export function FilterSheet({ onClose }) {
           {labels.map((l) => <button key={l} class={`label-chip${f.labels.includes(l) ? ' on' : ''}`} onClick={() => setF({ ...f, labels: toggle(f.labels, l) })}>#{l}</button>)}
         </div>
       )}
+      </>}
     </Sheet>
   );
 }

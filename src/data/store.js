@@ -211,12 +211,13 @@ export async function syncNow() {
 }
 
 /* ---------- derived ---------- */
-export const EMPTY_FILTER = { accounts: [], cats: [], labels: [] };
-export const filterCount = (f = state.settings.filter) => (f?.accounts?.length || 0) + (f?.cats?.length || 0) + (f?.labels?.length || 0);
+export const EMPTY_FILTER = { accounts: [], cats: [], labels: [], type: 'all' }; // type: all | expense | income
+export const filterCount = (f = state.settings.filter) => (f?.accounts?.length || 0) + (f?.cats?.length || 0) + (f?.labels?.length || 0) + (f?.type && f.type !== 'all' ? 1 : 0);
 
 /** Record passes the analytics filter: accounts, categories (group id or sub id), labels. */
 export function matchFilter(r, f) {
   if (!f) return true;
+  if (f.type && f.type !== 'all' && r.type !== f.type) return false;
   if (f.accounts?.length && !f.accounts.includes(r.accountId) && !f.accounts.includes(r.toAccountId)) return false;
   if (f.cats?.length) {
     if (!r.categoryId) return false;

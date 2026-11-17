@@ -9,7 +9,7 @@ import { rub, fmt, plural } from '../data/format.js';
 import { Records } from './Records.jsx';
 import { Reports } from './Reports.jsx';
 import { Scheduled, Budgets, budgetSpent } from './Planning.jsx';
-import { AccountForm, Accounts, AccountFolder, accountSections, accLabel, ACC_ICON } from './Accounts.jsx';
+import { AccountForm, AddAccount, Accounts, AccountFolder, accountSections, accLabel, ACC_ICON } from './Accounts.jsx';
 import { SyncScreen } from './Settings.jsx';
 import { SyncChip } from './More.jsx';
 import { QuickTemplates } from './Templates.jsx';
@@ -165,7 +165,7 @@ function AccountsGrid({ accounts, records }) {
           </div>
         );
       })}
-      <button class="acc add" style={{ minHeight: 56, flexDirection: 'row' }} onClick={() => nav.push(AccountForm, {})}>
+      <button class="acc add" style={{ minHeight: 56, flexDirection: 'row' }} onClick={() => nav.sheet(AddAccount, { onClose: nav.closeSheet })}>
         <span class="plus" aria-hidden="true" style={{ width: 30, height: 30, fontSize: 'var(--fs-xl)' }}>+</span>
         <span>Новый счёт</span>
       </button>

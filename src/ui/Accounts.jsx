@@ -53,7 +53,7 @@ export function Accounts() {
     <Screen pushed title="Счета" back="Назад" onBack={nav.pop}
       right={<>
         <button class="link" onClick={() => setOrdering(!ordering)}>{ordering ? 'Готово' : 'Порядок'}</button>
-        {!ordering && <button class="link" onClick={() => nav.push(AccountForm, {})}>Добавить</button>}
+        {!ordering && <button class="link" onClick={() => nav.sheet(AddAccount, { onClose: nav.closeSheet })}>Добавить</button>}
       </>}>
       <div class="group-label">Всего в рублях: <span class="num">{rub(total)}</span></div>
       {ordering && <div class="note-box">Стрелками меняйте порядок — так же счета будут стоять на Обзоре. Карты одной папки на Обзоре стоят там, где первая из них.</div>}
@@ -107,7 +107,7 @@ export function AccountFolder({ group, owner }) {
             value={fmt(bal(a), a.currency)} onClick={() => nav.push(Records, { accountId: a.id, title: accLabel(a) })} />
         ))}
       </div>
-      <div class="note-box">Чтобы добавить карту в папку или убрать из неё — откройте карту → «Настройки счёта» → поле «Объединить в».</div>
+      <div class="note-box">Новую карту этого банка добавляйте через «Новый счёт» → выбрать банк. Убрать карту из папки: карта → «Настройки счёта» → «Банк (папка)» → «Без папки».</div>
     </Screen>
   );
 }
@@ -152,23 +152,81 @@ export function AdjustBalance({ account, current, onClose }) {
   );
 }
 
-export function AccountForm({ account }) {
+/**
+ * The banks a person already has, for "Куда добавить?" and the folder picker:
+ * folders (several cards) and single bank accounts (choosing one turns it into a folder).
+ */
+export function banksOf(accounts, owner, exceptId) {
+  const mine = sortAccounts(accounts).filter((a) => (a.owner || '') === (owner || '') && a.id !== exceptId);
+  const out = [];
+  const seen = new Set();
+  for (const a of mine) {
+    if (a.group) { if (!seen.has(a.group)) { seen.add(a.group); out.push({ key: 'g:' + a.group, label: a.group, group: a.group, color: a.color, folder: true }); } }
+    else if (a.kind === 'bank' || a.kind === 'credit' || a.kind === 'savings') out.push({ key: 'a:' + a.id, label: a.name, group: a.name, color: a.color, joinWith: a.id });
+  }
+  return out;
+}
+
+/** "Добавить": a new bank, or one more card in a bank you already have. */
+export function AddAccount({ onClose }) {
+  const s = useStore();
+  const nav = useNav();
+  const [owner, setOwner] = useState(s.settings.me);
+  const banks = banksOf(alive(s.ledger.accounts), owner);
+  const go = (preset) => { onClose(); nav.push(AccountForm, { preset: { owner, ...preset } }); };
+  return (
+    <Sheet short title="Куда добавить счёт?" onClose={onClose}>
+      <div style={{ padding: '0 var(--s4) var(--s3)' }}>
+        <div class="who">
+          {PEOPLE.map((p) => <button key={p} class={owner === p ? 'on' : ''} onClick={() => setOwner(p)}><span style={{ color: PERSON_COLOR[p] }}>●</span> {p}</button>)}
+          <button class={owner === '' ? 'on' : ''} onClick={() => setOwner('')}>Общий</button>
+        </div>
+      </div>
+      <div class="list option-list">
+        <Row icon="🆕" label={<><b>Новый банк или счёт</b><span class="muted" style={{ display: 'block', fontSize: 'var(--fs-xs)' }}>например, открыл карту Альфа-Банка</span></>} onClick={() => go({})} />
+      </div>
+      {banks.length > 0 && <div class="group-label">Ещё одна карта в банке</div>}
+      <div class="list option-list">
+        {banks.map((b) => (
+          <Row key={b.key} icon={<span class="dot" style={{ background: b.color, width: 18, height: 18 }} />} label={<>{b.label}{b.folder ? <span class="muted"> · 🗂️ папка</span> : ''}</>}
+            onClick={() => go({ group: b.group, color: b.color, kind: 'bank', joinWith: b.joinWith, name: b.label + ' ' })} />
+        ))}
+      </div>
+    </Sheet>
+  );
+}
+
+export function AccountForm({ account, preset }) {
   const nav = useNav();
   const s = useStore();
   const recs = alive(s.ledger.records);
-  const [f, setF] = useState(account || { name: '', kind: 'bank', color: COLORS[1], initial: 0, owner: s.settings.me, currency: 'RUB', group: '' });
+  const [f, setF] = useState(account || { name: '', kind: 'bank', color: COLORS[1], initial: 0, owner: s.settings.me, currency: 'RUB', group: '', ...(preset || {}) });
+  const banks = banksOf(alive(s.ledger.accounts), f.owner, account?.id);
+  const folderValue = f.joinWith ? 'a:' + f.joinWith : f.group ? 'g:' + f.group : '';
+  const pickFolder = (v) => {
+    if (v === '__new') {
+      const n = prompt('Название папки (банка)', '');
+      if (n && n.trim()) setF({ ...f, group: n.trim().slice(0, 30), joinWith: undefined });
+      return;
+    }
+    const b = banks.find((x) => x.key === v);
+    setF({ ...f, group: b ? b.group : '', joinWith: b?.joinWith });
+  };
   const current = account ? accountBalance(account, recs) : null;
   const [balance, setBalance] = useState(current !== null ? String(Math.round(current * 100) / 100).replace('.', ',') : '0');
   const set = (k) => (e) => setF({ ...f, [k]: e.currentTarget.value });
   const save = () => {
     if (!f.name.trim()) return;
     const typed = Number(String(balance).replace(/\s/g, '').replace(',', '.'));
+    const { joinWith, ...clean } = f;
+    // A single card chosen as the bank becomes a folder together with this one.
+    if (joinWith) { const other = s.ledger.accounts.find((a) => a.id === joinWith); if (other) upsert('accounts', { ...other, group: f.group }); }
     if (account) {
       // Existing account: keep the start, record the difference as "Изменение баланса счёта" (like Wallet does).
-      upsert('accounts', { ...f, name: f.name.trim(), group: (f.group || '').trim() || undefined });
+      upsert('accounts', { ...clean, name: f.name.trim(), group: (f.group || '').trim() || undefined });
       if (Number.isFinite(typed)) adjustBalance(account, current, typed, s.settings.me);
     } else {
-      upsert('accounts', { ...f, name: f.name.trim(), group: (f.group || '').trim() || undefined, initial: Number.isFinite(typed) ? typed : 0 });
+      upsert('accounts', { ...clean, name: f.name.trim(), group: (f.group || '').trim() || undefined, initial: Number.isFinite(typed) ? typed : 0 });
     }
     nav.pop();
   };
@@ -197,12 +255,19 @@ export function AccountForm({ account }) {
           </select>
         </label>
         <label class="row"><span class="rl">Баланс сейчас, {CURRENCIES[f.currency || 'RUB']}{account && <span class="muted" style={{ display: 'block', fontSize: 'var(--fs-xs)' }}>изменение запишется отдельной записью</span>}</span><input inputMode="decimal" value={balance} onInput={(e) => setBalance(e.currentTarget.value)} /></label>
-        <label class="row"><span class="rl">Объединить в</span><input value={f.group || ''} onInput={set('group')} placeholder="Папка, например «ПСБ»" maxLength={30} /></label>
+        <label class="row"><span class="rl">Банк (папка)</span>
+          <select value={folderValue} onChange={(e) => pickFolder(e.currentTarget.value)}>
+            <option value="">Без папки</option>
+            {f.group && !banks.some((b) => b.group === f.group) && <option value={'g:' + f.group}>{f.group}</option>}
+            {banks.map((b) => <option key={b.key} value={b.key}>{b.label}{b.folder ? ' (папка)' : ''}</option>)}
+            <option value="__new">Новая папка…</option>
+          </select>
+        </label>
         <div class="row"><span class="rl">Цвет</span>
           <div class="swatches">{COLORS.map((c) => <button key={c} aria-label="Цвет" class={f.color === c ? 'on' : ''} style={{ background: c }} onClick={() => setF({ ...f, color: c })} />)}</div>
         </div>
       </div>
-      <div class="note-box">Счета с одинаковым «Объединить в» становятся на Обзоре одной папкой с общей суммой, например «ПСБ» с двумя картами или «Подушка» в рублях, долларах и евро. Нажмите на папку, чтобы увидеть каждую карту.</div>
+      <div class="note-box">Выберите банк, и карта окажется в его папке на Обзоре: общая сумма сверху, каждая карта внутри. Если у банка пока одна карта, папка создастся сама.</div>
       {account && (
         <div style={{ padding: 'var(--s4)', display: 'grid', gap: 8 }}>
           <button class="btn" onClick={() => nav.push(Records, { accountId: account.id, title: accLabel(account) })}>Записи по счёту</button>

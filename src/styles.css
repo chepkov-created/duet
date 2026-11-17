@@ -366,3 +366,7 @@ input, select, textarea { font: inherit; color: inherit; }
 .dock-more { margin: var(--s2) calc(-1 * var(--s4)) 0; border-top: 1px solid var(--line); }
 .dock-more .row { min-height: 50px; }
 .pager button.on { background: none; }
+.period-dock { padding-top: var(--s3); }
+.dock-foot { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; margin-top: 6px; }
+.dock-foot .pager { margin-top: 0; }
+.dock-toggle { justify-self: end; color: var(--accent); font-size: var(--fs-s); font-weight: 600; padding: 6px 2px; display: inline-flex; gap: 4px; align-items: center; }
