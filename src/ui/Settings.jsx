@@ -77,7 +77,6 @@ export function Settings() {
   const s = useStore();
   const nav = useNav();
   const st = s.settings;
-  const [key, setKey] = useState(st.aiKey);
   const exportJson = () => {
     const blob = new Blob([JSON.stringify(getState().ledger, null, 1)], { type: 'application/json' });
     const a = document.createElement('a');
@@ -123,19 +122,6 @@ export function Settings() {
         <Row label={<span class="accent">Взять курс ЦБ сейчас</span>} chevron={false} onClick={() => refreshRates(true)} value={st.rates?.manual ? 'сейчас вручную' : st.rates?.at ? `ЦБ, ${new Date(st.rates.at).toLocaleDateString('ru-RU')}` : ''} />
       </div>
 
-      <div class="group-label">Распознавание скриншотов</div>
-      <div class="list inset plain">
-        <label class="row"><span class="rl">Ключ Anthropic</span><input type="password" value={key} placeholder="sk-ant-…" autoComplete="off" onInput={(e) => setKey(e.currentTarget.value.trim())} onBlur={() => updateSettings({ aiKey: key })} /></label>
-        <label class="row"><span class="rl">Модель</span>
-          <select value={st.aiModel} onChange={(e) => updateSettings({ aiModel: e.currentTarget.value })}>
-            <option value="claude-opus-5-5">Opus 5.5 (точнее)</option>
-            <option value="claude-sonnet-5-5">Sonnet 5.5</option>
-            <option value="claude-haiku-5-5">Haiku 5.5 (дешевле)</option>
-          </select>
-        </label>
-      </div>
-      <div class="note-box">Ключ создаётся на platform.claude.com → API keys. Он хранится только на этом телефоне и не попадает в GitHub. Скриншоты отправляются в Anthropic только в момент распознавания.</div>
-
       <div class="group-label">Данные</div>
       <div class="list inset plain">
         <Row label={<span class="accent">Скачать резервную копию</span>} chevron={false} onClick={exportJson} />
@@ -154,7 +140,7 @@ export function About() {
       <div class="note-box" style={{ fontSize: 'var(--fs-m)' }}>
         <p><b>Дуэт</b> — семейный учёт денег для двоих.</p>
         <p>• Каждая запись помечена — Миша или Арина. Переключатель «Общее / Миша / Арина» вверху меняет, чьи траты видно.</p>
-        <p>• Кнопка с камерой разбирает скриншот операций из банка и предлагает готовые записи.</p>
+        <p>• Кнопка с камерой разбирает скриншот операций из банка и предлагает готовые записи. Бесплатно, прямо на телефоне.</p>
         <p>• Данные живут на телефоне и синхронизируются через приватный репозиторий GitHub. Работает без интернета, синхронизируется, когда сеть появляется.</p>
         <p>Версия 1.0</p>
       </div>

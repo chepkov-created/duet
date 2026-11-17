@@ -38,7 +38,6 @@ const defaultSettings = () => ({
   me: '',
   view: 'all', // all | <person>
   ghOwner: '', ghRepo: '', ghToken: '', ghPath: 'ledger.json',
-  aiKey: '', aiModel: 'claude-opus-5-5',
   hidePromo: false,
   filter: { accounts: [], cats: [], labels: [] },
   rates: { USD: 0, EUR: 0, at: 0, manual: false }, // rubles per unit

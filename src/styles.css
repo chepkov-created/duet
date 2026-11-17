@@ -333,3 +333,8 @@ input, select, textarea { font: inherit; color: inherit; }
 .acc.wide { grid-column: 1 / -1; min-height: 0; }
 .pillow-lines { display: flex; gap: var(--s4); flex-wrap: wrap; margin-top: 4px; }
 .pillow-lines span { font-size: var(--fs-m); font-weight: 600; }
+
+/* free scan */
+.paste-box { width: 100%; background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-m); padding: var(--s3); font-size: var(--fs-s); resize: vertical; }
+.scan-name { background: transparent; border: 0; color: var(--text); font-weight: 500; font-size: var(--fs-m); width: 100%; padding: 0; outline: none; }
+.scan-name:focus { border-bottom: 1px solid var(--accent); }
