@@ -58,14 +58,37 @@ export function totals(records, range) {
   return { income, expense, flow: income - expense, nIn, nOut };
 }
 
+/**
+ * A receipt can mix categories (food + household in one Magnit check). The record keeps the bank amount;
+ * items with their own category get their share of it, the rest stays in the record's category.
+ * Returns [[categoryId, amount], ...] summing to r.amount.
+ */
+export function splitByItems(r) {
+  const items = (r.items || []).filter((it) => it.categoryId && Number(String(it.sum).replace(',', '.')) > 0);
+  if (!items.length) return [[r.categoryId, r.amount]];
+  const num = (v) => Number(String(v).replace(/\s/g, '').replace(',', '.')) || 0;
+  const all = (r.items || []).reduce((a, it) => a + num(it.sum), 0);
+  if (!all) return [[r.categoryId, r.amount]];
+  const k = r.amount / all; // scale to the real charge (discounts, rounding)
+  const out = new Map();
+  let used = 0;
+  for (const it of items) { const v = num(it.sum) * k; out.set(it.categoryId, (out.get(it.categoryId) || 0) + v); used += v; }
+  const rest = r.amount - used;
+  if (Math.abs(rest) > 0.005) out.set(r.categoryId, (out.get(r.categoryId) || 0) + rest);
+  return [...out];
+}
+
 /** sums by category id and by group id for one type */
 export function byCategory(records, range, type = 'expense') {
   const cats = {}, groups = {};
+  const put = (catId, v) => {
+    const c = category(catId);
+    cats[c.id] = (cats[c.id] || 0) + v;
+    groups[c.group] = (groups[c.group] || 0) + v;
+  };
   for (const r of records) {
     if (r.type !== type || !inRange(r, range)) continue;
-    const c = category(r.categoryId);
-    cats[c.id] = (cats[c.id] || 0) + r.amount;
-    groups[c.group] = (groups[c.group] || 0) + r.amount;
+    for (const [catId, v] of splitByItems(r)) put(catId, v);
   }
   return { cats, groups };
 }

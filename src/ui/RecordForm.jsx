@@ -7,7 +7,7 @@ import { TemplatePicker } from './Templates.jsx';
 import { category, allowsItems, EXPENSE_GROUPS, INCOME_GROUPS } from '../data/categories.js';
 
 /** Receipt breakdown: name × qty = line sum. Shown only for categories where it makes sense. */
-function ItemsBlock({ items, total, onChange, onUseSum }) {
+function ItemsBlock({ items, total, onChange, onUseSum, onPickCat }) {
   const num = (t) => Number(String(t || '').replace(/\s/g, '').replace(',', '.')) || 0;
   const sum = Math.round(items.reduce((a, it) => a + num(it.sum), 0) * 100) / 100;
   const set = (i, patch) => onChange(items.map((it, j) => (j === i ? { ...it, ...patch } : it)));
@@ -22,6 +22,8 @@ function ItemsBlock({ items, total, onChange, onUseSum }) {
           <input style={{ flex: 3, textAlign: 'left' }} placeholder="Товар" aria-label="Товар" value={it.name} onInput={(e) => set(i, { name: e.currentTarget.value })} />
           <input style={{ flex: 1, maxWidth: 48 }} inputMode="decimal" aria-label="Количество" value={it.qty} onInput={(e) => set(i, { qty: e.currentTarget.value })} />
           <input style={{ flex: 1.4 }} inputMode="decimal" placeholder="₽" aria-label="Сумма" value={it.sum} onInput={(e) => set(i, { sum: e.currentTarget.value })} />
+          <button class="item-cat" title={it.categoryId ? category(it.categoryId).name : 'Как у записи'} aria-label={`Категория позиции: ${it.categoryId ? category(it.categoryId).name : 'как у записи'}`} onClick={() => onPickCat(i)}
+            style={{ background: it.categoryId ? category(it.categoryId).color : 'var(--surface-3)' }}>{it.categoryId ? category(it.categoryId).icon : '·'}</button>
           <button class="link" aria-label="Убрать позицию" style={{ color: 'var(--text-3)' }} onClick={() => onChange(items.filter((_, j) => j !== i))}>✕</button>
         </div>
       ))}
@@ -108,6 +110,11 @@ export function RecordForm({ record, defaults, template }) {
       setF((x) => ({ ...x, ...pickTemplate(t), amountText: t.amount ? String(t.amount).replace('.', ',') : '', template: t.id }));
       setPicker(null);
     }} />;
+  }
+  if (typeof picker === 'number') {
+    const i = picker;
+    return <CategoryPicker type="expense" onClose={() => setPicker(null)}
+      onPick={(id) => { upd({ items: (f.items || []).map((it, j) => (j === i ? { ...it, categoryId: id === f.categoryId ? undefined : id } : it)) }); setPicker(null); }} />;
   }
   if (picker === 'cat') {
     return <CategoryPicker type={f.type} onPick={(id) => { upd({ categoryId: id }); setPicker(null); }} onClose={() => setPicker(null)} />;
@@ -207,7 +214,7 @@ export function RecordForm({ record, defaults, template }) {
         <label class="row"><span class="ri" aria-hidden="true">✍️</span><span class="rl">Заметка</span><input value={f.note} placeholder="Необязательно" onInput={(e) => upd({ note: e.currentTarget.value })} maxLength={140} /></label>
         <label class="row"><span class="ri" aria-hidden="true">🏪</span><span class="rl">Получатель</span><input value={f.payee} placeholder="Магазин или человек" onInput={(e) => upd({ payee: e.currentTarget.value })} maxLength={80} /></label>
         {!isTpl && (allowsItems(f.categoryId) || (f.items || []).length > 0) && (
-          <ItemsBlock items={f.items || []} total={amount} onChange={(items) => upd({ items })} onUseSum={(sum) => upd({ amountText: String(sum).replace('.', ',') })} />
+          <ItemsBlock items={f.items || []} total={amount} onChange={(items) => upd({ items })} onUseSum={(sum) => upd({ amountText: String(sum).replace('.', ',') })} onPickCat={(i) => setPicker(i)} />
         )}
         <LabelsRow labels={f.labels || []} onChange={(labels) => upd({ labels })} />
         {!isTpl && (
