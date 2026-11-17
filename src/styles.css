@@ -250,7 +250,7 @@ input, select, textarea { font: inherit; color: inherit; }
 .option-list .row { min-height: 56px; }
 
 /* amount entry */
-.amount-box { background: var(--surface); padding: var(--s4); display: flex; align-items: center; gap: var(--s3); }
+.amount-box { position: relative; overflow: hidden; background: var(--surface); padding: var(--s4); display: flex; align-items: center; gap: var(--s3); }
 .cur { background: var(--surface-3); color: var(--text-2); border-radius: var(--r-pill); padding: 8px 18px; font-size: var(--fs-l); }
 .amount-input { flex: 1; text-align: right; background: transparent; border: 0; outline: none; font-size: 64px; font-weight: 300; min-width: 0; }
 .amount-input.expense { color: var(--neg-text); }

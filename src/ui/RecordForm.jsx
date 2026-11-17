@@ -20,16 +20,16 @@ function AmountInput({ value, onChange, cls, big, placeholder, autoFocus }) {
   const base = big ? 64 : 40;
   const ref = useRef(null);
   const [size, setSize] = useState(base);
-  // Measure the real text width in the real font and shrink until it fits with a margin.
+  // Measure with an invisible copy of the text styled exactly like the field (canvas fonts differ on iPhone).
+  const probe = useRef(null);
   useLayoutEffect(() => {
-    const el = ref.current; if (!el) return;
+    const el = ref.current, pr = probe.current; if (!el || !pr) return;
+    pr.style.fontSize = base + 'px';
+    pr.textContent = (shown || placeholder || '0');
+    const w = pr.getBoundingClientRect().width;
     const cs = getComputedStyle(el);
-    const ctx = (AmountInput.c ||= document.createElement('canvas').getContext('2d'));
-    ctx.font = `${cs.fontWeight} ${base}px ${cs.fontFamily}`;
-    const text = (shown || placeholder || '0') + (cls === 'expense' ? '-' : '');
-    const w = ctx.measureText(text).width + 6;
-    const avail = el.clientWidth - 12;
-    setSize(Math.max(18, Math.min(base, Math.floor(base * avail / w))));
+    const avail = el.clientWidth - parseFloat(cs.paddingLeft || 0) - parseFloat(cs.paddingRight || 0) - 14; // room for the caret
+    setSize(Math.max(18, Math.min(base, Math.floor((base * avail) / Math.max(1, w)))));
   }, [shown, base]);
   const onInput = (e) => {
     const el = e.currentTarget;
@@ -44,7 +44,13 @@ function AmountInput({ value, onChange, cls, big, placeholder, autoFocus }) {
       try { el.setSelectionRange(pos, pos); } catch { /* not focused */ }
     });
   };
-  return <input ref={ref} class={`amount-input num ${cls}`} style={{ fontSize: size }} inputMode="decimal" placeholder={placeholder} autoFocus={autoFocus} value={shown} onInput={onInput} />;
+  return (
+    <>
+      <span ref={probe} class={`amount-input num ${cls}`} aria-hidden="true"
+        style={{ position: 'absolute', visibility: 'hidden', whiteSpace: 'pre', flex: 'none', width: 'auto', left: -9999, top: 0, pointerEvents: 'none' }} />
+      <input ref={ref} class={`amount-input num ${cls}`} style={{ fontSize: size }} inputMode="decimal" placeholder={placeholder} autoFocus={autoFocus} value={shown} onInput={onInput} />
+    </>
+  );
 }
 
 /** Receipt breakdown: name × qty = line sum. Shown only for categories where it makes sense. */
