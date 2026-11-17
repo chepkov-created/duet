@@ -41,8 +41,8 @@ export function Records({ accountId, categoryIds, title = 'Записи', range,
     ? alive(s.ledger.records).filter((r) => accIds.includes(r.accountId) || accIds.includes(r.toAccountId)).map((r) => (singleAcc ? r : inRub(r, s)))
     : visibleRecords(s);
   if (owner) recs = visibleRecords({ ...s, settings: { ...s.settings, view: owner } });
-  // Global search: both people, no filters.
-  if (everything) recs = alive(s.ledger.records).map((r) => inRub(r, s));
+  // Search: whoever the switch shows (yourself by default), without category/account filters.
+  if (everything) recs = visibleRecords(s, { ignoreFilter: true });
   if (categoryIds) recs = recs.filter((r) => categoryIds.includes(r.categoryId));
   if (range) recs = recs.filter((r) => { const d = new Date(r.date); return d >= range.from && d <= range.to; });
   const needle = norm(q);
@@ -62,9 +62,8 @@ export function Records({ accountId, categoryIds, title = 'Записи', range,
   }
   return (
     <Screen pushed title={title} back={back} onBack={nav.pop} right={<>{!accountId && !everything && <FilterButton />}<button class="link" onClick={() => nav.record(null, singleAcc ? { accountId: singleAcc.id } : undefined)}>Добавить</button></>}>
-      {!accountId && !everything && <div style={{ padding: '0 var(--s4) var(--s3)' }}><PersonSwitch /></div>}
+      {!accountId && <div style={{ padding: '0 var(--s4) var(--s3)' }}><PersonSwitch /></div>}
       {!accountId && !everything && <FilterBar />}
-      {everything && <div class="note-box">Ищет по всем записям — и Миши, и Арины, без фильтров.</div>}
       <label class="search">
         <span aria-hidden="true">🔍</span>
         <span class="sr-only">Поиск по записям</span>

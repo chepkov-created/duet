@@ -1,7 +1,7 @@
 import { createContext } from 'preact';
 import { useContext, useEffect, useState } from 'preact/hooks';
 import { Svg } from './kit.jsx';
-import { useStore, scheduleSync, syncNow, syncConfigured, refreshRates } from '../data/store.js';
+import { useStore, scheduleSync, syncNow, syncConfigured, refreshRates, getState, updateSettings } from '../data/store.js';
 import { Overview } from './Overview.jsx';
 import { Planning } from './Planning.jsx';
 import { Stats } from './Stats.jsx';
@@ -23,6 +23,9 @@ export function App() {
   useEffect(() => {
     if (syncConfigured()) syncNow(); else scheduleSync();
     refreshRates();
+    // Each launch starts with your own records; the switch can show shared or the other person until the app is closed.
+    const st = getState().settings;
+    if (st.me && st.view !== st.me) updateSettings({ view: st.me });
     const onVis = () => document.visibilityState === 'visible' && syncConfigured() && syncNow();
     document.addEventListener('visibilitychange', onVis);
     // Connection is back: send what was saved offline right away.

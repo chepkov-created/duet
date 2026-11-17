@@ -13,7 +13,7 @@ export function Onboarding() {
       <p style={{ textAlign: 'center', color: 'var(--text-2)', margin: 0, lineHeight: 1.45 }}>Общий бюджет на двоих. Каждая запись помечена тем, кто её сделал, а смотреть можно и свои траты, и общие.</p>
       <div class="caption" style={{ textAlign: 'center' }}>Кто пользуется этим телефоном?</div>
       {PEOPLE.map((p) => (
-        <button key={p} class="btn" style={{ fontSize: 'var(--fs-xl)' }} onClick={() => updateSettings({ me: p })}>
+        <button key={p} class="btn" style={{ fontSize: 'var(--fs-xl)' }} onClick={() => updateSettings({ me: p, view: p })}>
           <span style={{ color: PERSON_COLOR[p] }}>●</span> {p}
         </button>
       ))}
@@ -104,7 +104,7 @@ export function Settings() {
       <div class="group-label">Этот телефон</div>
       <div class="list inset plain">
         <div class="row"><span class="rl">Я —</span>
-          <div class="who">{PEOPLE.map((p) => <button key={p} class={st.me === p ? 'on' : ''} onClick={() => updateSettings({ me: p })}><span style={{ color: PERSON_COLOR[p] }}>●</span> {p}</button>)}</div>
+          <div class="who">{PEOPLE.map((p) => <button key={p} class={st.me === p ? 'on' : ''} onClick={() => updateSettings({ me: p, view: p })}><span style={{ color: PERSON_COLOR[p] }}>●</span> {p}</button>)}</div>
         </div>
         <Row label="Синхронизация" value={syncConfigured(st) ? 'GitHub' : 'Выключена'} onClick={() => nav.push(SyncScreen, {})} />
       </div>
