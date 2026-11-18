@@ -8,7 +8,7 @@ import { category, group, EXPENSE_GROUPS } from '../data/categories.js';
 import { rub, toLocalInput, addMonths, addDays } from '../data/format.js';
 import { periodRange, inRange } from '../data/periods.js';
 import { CategoryPicker } from './RecordForm.jsx';
-import { payScheduled, duePayments, myScheduled } from './Payments.jsx';
+import { payScheduled, duePayments, myScheduled, Scheduled } from './Payments.jsx';
 
 export function Planning() {
   const nav = useNav();
@@ -41,7 +41,7 @@ export const nextDate = (iso, repeat) => {
   return null;
 };
 
-export { Scheduled } from './Payments.jsx';
+export { Scheduled };
 
 export function ScheduledForm({ item, onClose }) {
   const s = useStore();
