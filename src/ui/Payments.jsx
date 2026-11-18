@@ -2,8 +2,10 @@
 // "Отметить как оплачено" / "Пропустить", notifications (bell) and the forecast.
 import { useState } from 'preact/hooks';
 import { useNav } from './App.jsx';
-import { Screen, Empty, Segmented, CatIcon } from './kit.jsx';
-import { DayBars, dayBuckets } from './viz.jsx';
+import { Screen, Empty, Segmented, CatIcon, Sheet } from './kit.jsx';
+import { AmountInput } from './RecordForm.jsx';
+import { Calendar } from './DatePick.jsx';
+import { DayBars, dayBuckets, Carousel } from './viz.jsx';
 import { useStore, alive, upsert, remove, getState, updateSettings, accountBalance, inRub } from '../data/store.js';
 import { category } from '../data/categories.js';
 import { rub, addMonths, dayStart, dayLabel, plural } from '../data/format.js';
@@ -23,15 +25,26 @@ export const myScheduled = (s = getState()) => alive(s.ledger.scheduled).filter(
 /** Payments due today, tomorrow or overdue: the badge on «Планы» and the bell. */
 export const duePayments = (s = getState()) => myScheduled(s).filter((x) => daysUntil(x.date) <= 1).sort((a, b) => new Date(a.date) - new Date(b.date));
 
-/** Pay the nearest occurrence: a real record linked to the payment, then move to the next date. */
-export function payScheduled(x, amount = x.amount, date = new Date().toISOString()) {
+const dkey = (iso) => String(iso).slice(0, 10);
+/** Amount of one occurrence: changed with «Редактировать» on that date, else the usual one. */
+export const amountFor = (x, occ = x.date) => (x.amounts || {})[dkey(occ)] ?? x.amount;
+/** Next `count` unpaid dates of a payment (dates already paid or skipped ahead are left out). */
+export function upcomingDates(x, count = 2) {
+  const done = new Set((x.done || []).map(dkey));
+  const out = [];
+  for (let d = x.date, i = 0; d && out.length < count && i < 60; i++, d = nextDate(d, x.repeat, x)) if (!done.has(dkey(d))) out.push(d);
+  return out;
+}
+
+/** Pay one occurrence (the nearest by default): a real record linked to the payment. */
+export function payScheduled(x, amount = amountFor(x), date = new Date().toISOString(), occ = x.date) {
   upsert('records', {
     // fixed id per occurrence: if both phones confirm the same payment, it is still one record
-    id: `sch-${x.id}-${x.date.slice(0, 10)}`,
+    id: `sch-${x.id}-${dkey(occ)}`,
     type: x.type, amount, accountId: x.accountId, categoryId: x.categoryId, owner: x.owner || getState().settings.me,
-    date, note: x.note ? `${x.name} · ${x.note}` : x.name, payee: x.payee || '', labels: x.labels || [], status: 'done', payment: x.payment || 'Карта', scheduledId: x.id, dueDate: x.date,
+    date, note: x.note ? `${x.name} · ${x.note}` : x.name, payee: x.payee || '', labels: x.labels || [], status: 'done', payment: x.payment || 'Карта', scheduledId: x.id, dueDate: occ,
   });
-  advance(x);
+  if (dkey(occ) === dkey(x.date)) advance(x); else upsert('scheduled', { ...x, done: [...(x.done || []), occ] });
 }
 /** Payments with «Автоматически»: on the due day the record is created by itself (on the owner's phone). */
 export function autoPayDue(s = getState()) {
@@ -40,7 +53,7 @@ export function autoPayDue(s = getState()) {
     if (x0.confirm !== 'auto' || (x0.owner && x0.owner !== s.settings.me)) continue;
     let x = x0;
     for (let i = 0; i < 24 && x && daysUntil(x.date) <= 0; i++) {
-      payScheduled(x, x.amount, x.date);
+      payScheduled(x, amountFor(x), x.date);
       n++;
       const nd = nextDate(x.date, x.repeat, x);
       x = nd ? { ...x, date: nd } : null;
@@ -48,10 +61,18 @@ export function autoPayDue(s = getState()) {
   }
   return n;
 }
-export function skipScheduled(x) { advance({ ...x, skipped: [...(x.skipped || []), x.date] }); }
+export function skipScheduled(x, occ = x.date) {
+  const y = { ...x, skipped: [...(x.skipped || []), occ] };
+  if (dkey(occ) === dkey(x.date)) advance(y); else upsert('scheduled', { ...y, done: [...(x.done || []), occ] });
+}
+/** Move to the next date that wasn't already paid ahead; a one-off payment ends. */
 function advance(x) {
-  const nd = nextDate(x.date, x.repeat, x);
-  if (nd) upsert('scheduled', { ...x, date: nd }); else remove('scheduled', x.id);
+  const done = new Set((x.done || []).map(dkey));
+  let nd = nextDate(x.date, x.repeat, x);
+  for (let i = 0; nd && done.has(dkey(nd)) && i < 60; i++) nd = nextDate(nd, x.repeat, x);
+  if (!nd) return remove('scheduled', x.id);
+  const amounts = Object.fromEntries(Object.entries(x.amounts || {}).filter(([k]) => k >= dkey(nd)));
+  upsert('scheduled', { ...x, date: nd, done: (x.done || []).filter((d) => dkey(d) > dkey(nd)), amounts });
 }
 
 /* ---------- list ---------- */
@@ -101,7 +122,7 @@ export function PayRow({ x, onClick }) {
       </span>
       <span class="pay-side">
         {n <= 1 && <span class="badge-dot inline" style={{ margin: 0 }}>1</span>}
-        <span class={`num ${x.type === 'income' ? 'pos-text' : ''}`} style={{ fontSize: 'var(--fs-l)' }}>{rub(x.type === 'income' ? x.amount : -x.amount)}</span>
+        <span class={`num ${x.type === 'income' ? 'pos-text' : ''}`} style={{ fontSize: 'var(--fs-l)' }}>{rub(x.type === 'income' ? amountFor(x) : -amountFor(x))}</span>
         <span class={n <= 1 ? 'due-soon' : 'muted'} style={{ fontSize: 'var(--fs-s)' }}>{dueText(n)}</span>
       </span>
     </button>
@@ -109,63 +130,114 @@ export function PayRow({ x, onClick }) {
 }
 
 /* ---------- card ---------- */
+const statusText = (n) => (n < 0 ? `Просрочено на ${-n} ${plural(-n, 'день', 'дня', 'дней')}` : n === 0 ? 'Срок сегодня' : n === 1 ? 'Срок завтра' : `Срок через ${n} ${plural(n, 'день', 'дня', 'дней')}`);
+const Clock = ({ color }) => (
+  <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" style={{ flex: 'none' }}>
+    <circle cx="10" cy="10" r="10" fill={color} /><path d="M10 4.5V10h4" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" />
+  </svg>
+);
+const Tick = () => (
+  <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" style={{ flex: 'none' }}>
+    <circle cx="10" cy="10" r="10" fill="var(--text-2)" /><path d="M5.5 10.2l3 3 6-6.4" stroke="var(--bg)" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+  </svg>
+);
+
 export function PaymentDetail({ id }) {
   const s = useStore();
   const nav = useNav();
   const [edit, setEdit] = useState(false);
+  const [occEdit, setOccEdit] = useState(null);
+  const [page, setPage] = useState(0);
   const x = alive(s.ledger.scheduled).find((y) => y.id === id);
   if (!x) return <Screen pushed title="Платёж" back="Назад" onBack={nav.pop}><Empty icon="✓" text="Платёж завершён или удалён" /></Screen>;
-  const upcoming = [x.date];
-  const nd = nextDate(x.date, x.repeat, x);
-  if (nd) upcoming.push(nd);
-  const paid = alive(s.ledger.records).filter((r) => r.scheduledId === id).map((r) => ({ kind: 'paid', date: r.dueDate || r.date, at: r.date, amount: r.amount, rid: r.id }));
+  const upcoming = upcomingDates(x, 2);
+  const paid = alive(s.ledger.records).filter((r) => r.scheduledId === id).map((r) => ({ kind: 'paid', date: r.dueDate || r.date, at: r.date, amount: r.amount }));
   const skipped = (x.skipped || []).map((d) => ({ kind: 'skip', date: d }));
   const history = [...paid, ...skipped].sort((a, b) => new Date(b.date) - new Date(a.date));
   const acc = s.ledger.accounts.find((a) => a.id === x.accountId);
-  const pay = () => {
-    const v = prompt('Сумма оплаты', String(x.amount).replace('.', ','));
-    if (v === null) return;
-    const n = Number(String(v).replace(/\s/g, '').replace(',', '.'));
-    if (n > 0) { payScheduled(x, n); nav.toast(`Оплачено: ${x.name} · ${rub(-n)}`); }
-  };
+  const sign = (v) => rub(x.type === 'income' ? v : -v);
+  const pay = (occ) => { const v = amountFor(x, occ); payScheduled(x, v, new Date().toISOString(), occ); nav.toast(`Оплачено: ${x.name} · ${sign(v)}`); };
+  const info = [
+    ['Счёт', acc ? accLabel(acc) : '—'], ['Повтор', repeatText(x)], ['Подтверждение', x.confirm === 'auto' ? 'Автоматически' : 'Вручную'],
+    ['Тип платежа', x.payment || 'Карта'], x.payee && ['Получатель', x.payee], x.note && ['Заметка', x.note], x.labels?.length && ['Метки', x.labels.join(', ')],
+  ].filter(Boolean);
   return (
-    <Screen pushed title={x.name} back="Назад" onBack={nav.pop} right={<button class="link" onClick={() => setEdit(true)}>Изменить</button>}>
-      <div class="pay-hero">
-        <CatIcon catId={x.categoryId} size={72} />
-        <div class="pay-name">{x.name}</div>
-        <div class="muted">{category(x.categoryId).name} · {accLabel(acc)}</div>
-        <div class={`pay-amount num ${x.type === 'income' ? 'pos-text' : ''}`}>{rub(x.type === 'income' ? x.amount : -x.amount)}</div>
+    <Screen pushed title={x.name} back="Назад" onBack={nav.pop} right={<button class="link" onClick={() => setEdit(true)}>Редактировать</button>}>
+      <div class="pay-hero-wrap">
+        <Carousel page={page} onChange={setPage} dotLabel="Карточка" pages={[
+          <div key="a" class="pay-hero">
+            <CatIcon catId={x.categoryId} size={96} />
+            <div class="pay-name">{x.name}</div>
+            <div class="muted" style={{ fontSize: 'var(--fs-l)' }}>{category(x.categoryId).name}</div>
+            <div class={`pay-amount num ${x.type === 'income' ? 'pos-text' : ''}`}>{sign(x.amount)}</div>
+          </div>,
+          <div key="b" class="pay-info">
+            {info.map(([k, v]) => <div key={k} class="pay-info-row"><span class="muted">{k}</span><span>{v}</span></div>)}
+          </div>,
+        ]} />
       </div>
       <div class="group-label">Обзор платежа</div>
-      <div class="list inset">
-        {upcoming.map((d, i) => {
+      <div class="list">
+        {upcoming.map((d) => {
           const n = daysUntil(d);
+          const color = n < 0 ? 'var(--neg)' : n <= 1 ? 'var(--warn)' : 'var(--accent)';
+          const custom = amountFor(x, d) !== x.amount;
           return (
             <div key={d} class="pay-occ">
-              <div style={{ fontWeight: 600, fontSize: 'var(--fs-l)' }}>{fullDate(d)}</div>
-              <div class={n <= 1 ? 'due-soon' : 'muted'}>{n <= 1 ? '⚠️ ' : '🕑 '}Срок: {dueText(n).toLowerCase()}</div>
-              {i === 0 && (
-                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                  <button class="btn primary" style={{ padding: 10, fontSize: 'var(--fs-s)' }} onClick={pay}>Отметить как оплачено</button>
-                  <button class="btn" style={{ padding: 10, fontSize: 'var(--fs-s)' }} onClick={() => { skipScheduled(x); nav.toast('Платёж пропущен'); }}>Пропустить</button>
-                </div>
-              )}
+              <div class="pay-occ-date">{fullDate(d)}</div>
+              <div class="pay-occ-status" style={{ color }}><Clock color={color} />{statusText(n)}{custom && <span class="muted" style={{ marginLeft: 'auto' }}>{sign(amountFor(x, d))}</span>}</div>
+              <div class="pay-occ-btns">
+                <button class="btn primary sm" onClick={() => pay(d)}>Отметить как оплачено</button>
+                <button class="btn outline sm" onClick={() => setOccEdit(d)}>Редактировать</button>
+              </div>
             </div>
           );
         })}
         {history.map((h, i) => (
           <div key={i} class="pay-occ done">
-            <div style={{ fontWeight: 600 }}>{fullDate(h.date)}</div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span class="muted">{h.kind === 'paid' ? `✅ Оплачено ${dayLabel(h.at).toLowerCase()}` : '⏭ Пропущено'}</span>
-              {h.kind === 'paid' && <span class="num">{rub(-h.amount)}</span>}
+            <div class="pay-occ-date">{fullDate(h.date)}</div>
+            <div class="pay-occ-status">
+              {h.kind === 'paid' ? <Tick /> : <span aria-hidden="true">⏭</span>}
+              <span>{h.kind === 'paid' ? `Оплачено ${fullDate(h.at)}` : 'Пропущено'}</span>
+              {h.kind === 'paid' && <span class="num" style={{ marginLeft: 'auto' }}>{sign(h.amount)}</span>}
             </div>
           </div>
         ))}
-        {history.length === 0 && <div class="note-box">Оплат пока не было. «Отметить как оплачено» создаёт запись расхода и переносит платёж на следующий срок.</div>}
       </div>
+      {history.length === 0 && <div class="note-box">Оплат пока не было. «Отметить как оплачено» создаёт запись и переносит платёж на следующий срок.</div>}
+      <div style={{ height: 'var(--s6)' }} />
       {edit && <ScheduledForm item={x} onClose={() => setEdit(false)} />}
+      {occEdit && <OccurrenceSheet x={x} occ={occEdit} onClose={() => setOccEdit(null)} onPaid={(v) => nav.toast(`Оплачено: ${x.name} · ${sign(v)}`)} />}
     </Screen>
+  );
+}
+
+/** «Редактировать» one date of a payment: its own amount, the payment date, pay or skip just this one. */
+function OccurrenceSheet({ x, occ, onClose, onPaid }) {
+  const [text, setText] = useState(String(amountFor(x, occ)).replace('.', ','));
+  const [when, setWhen] = useState(() => (new Date(occ) > new Date() ? new Date() : new Date(occ)));
+  const amount = Number(String(text).replace(/\s/g, '').replace(',', '.')) || 0;
+  const keep = () => { upsert('scheduled', { ...x, amounts: { ...(x.amounts || {}), [dkey(occ)]: amount } }); onClose(); };
+  const pay = () => { if (!amount) return; payScheduled(x, amount, when.toISOString(), occ); onPaid(amount); onClose(); };
+  const skip = () => { skipScheduled(x, occ); onClose(); };
+  return (
+    <Sheet title={`Платёж ${fullDate(occ).replace(' г.', '')}`} onClose={onClose} right={<button class="link strong" onClick={keep} disabled={!amount}>Сохранить</button>}
+      footer={
+        <div style={{ display: 'grid', gap: 8 }}>
+          <button class="btn primary" onClick={pay} disabled={!amount}>Отметить как оплачено</button>
+          <button class="btn danger" onClick={skip}>Пропустить этот платёж</button>
+        </div>
+      }>
+      <label class="amount-box">
+        <span class="cur">RUB</span><span class="sr-only">Сумма</span>
+        <AmountInput cls={x.type} big value={text} onChange={setText} />
+      </label>
+      <div class="note-box">Сумма меняется только для этой даты. «Сохранить» — запомнить её, «Отметить как оплачено» — сразу записать.</div>
+      <div class="group-label">Дата оплаты</div>
+      <div class="list" style={{ padding: 'var(--s2) var(--s3)' }}>
+        <Calendar value={when} max={new Date()} onChange={(d) => { const t = new Date(d); const n = new Date(); t.setHours(n.getHours(), n.getMinutes(), 0, 0); setWhen(t); }} />
+      </div>
+    </Sheet>
   );
 }
 
@@ -178,7 +250,7 @@ export function notifications(s = getState()) {
     if (x.confirm === 'auto' || (n <= 0 && x.notifyDay === false)) continue;
     const key = `pay:${x.id}:${x.date.slice(0, 10)}`;
     if (dismissed[key]) continue;
-    out.push({ key, icon: '⏰', title: n < 0 ? 'Платёж просрочен' : n === 0 ? 'Платёж подлежит оплате сегодня' : 'Платёж подлежит оплате завтра', text: `Не забудьте оплатить: ${x.name} · ${rub(x.amount)}`, date: x.date, pay: x.id });
+    out.push({ key, icon: '⏰', title: n < 0 ? 'Платёж просрочен' : n === 0 ? 'Платёж подлежит оплате сегодня' : 'Платёж подлежит оплате завтра', text: `Не забудьте оплатить: ${x.name} · ${rub(amountFor(x))}`, date: x.date, pay: x.id });
   }
   const recs = alive(s.ledger.records).map((r) => inRub(r, s));
   for (const b of alive(s.ledger.budgets)) {
@@ -237,7 +309,7 @@ export function occurrences(list, from, to) {
   for (const x of list) {
     let d = x.date;
     for (let i = 0; d && new Date(d) <= to && i < 400; i++) {
-      if (new Date(d) >= from) out.push({ ...x, date: d });
+      if (new Date(d) >= from && !(x.done || []).some((y) => dkey(y) === dkey(d))) out.push({ ...x, date: d, amount: amountFor(x, d) });
       d = nextDate(d, x.repeat, x);
     }
   }

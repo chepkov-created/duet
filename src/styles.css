@@ -443,3 +443,18 @@ input, select, textarea { font: inherit; color: inherit; }
 .week-days button { width: 40px; height: 40px; border-radius: 50%; font-size: var(--fs-m); color: var(--text); }
 .week-days button.on { background: var(--accent); color: #fff; }
 .pill-btn.on { background: var(--accent); color: #fff; }
+/* payment card like the original */
+.pay-hero-wrap { background: var(--surface); padding-bottom: var(--s2); border-bottom: 1px solid var(--line); }
+.pay-hero .pay-amount { color: var(--text-2); font-size: var(--fs-xl); font-weight: 600; }
+.pay-info { padding: var(--s4); display: grid; gap: 10px; min-height: 230px; align-content: center; }
+.pay-info-row { display: flex; justify-content: space-between; gap: var(--s3); font-size: var(--fs-m); }
+.pay-info-row span:last-child { text-align: right; }
+.pay-occ { padding: var(--s4); gap: 6px; }
+.pay-occ-date { font-size: var(--fs-xl); font-weight: 700; }
+.pay-occ.done { opacity: 1; }
+.pay-occ.done .pay-occ-date, .pay-occ.done .pay-occ-status { color: var(--text-2); }
+.pay-occ-status { display: flex; align-items: center; gap: 8px; font-size: var(--fs-l); font-weight: 600; }
+.pay-occ.done .pay-occ-status { font-weight: 400; }
+.pay-occ-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+.btn.sm { padding: 9px 6px; font-size: var(--fs-s); font-weight: 500; border-radius: 8px; }
+.btn.outline { background: transparent; border: 1.5px solid var(--accent); color: var(--accent); }
