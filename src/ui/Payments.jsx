@@ -48,33 +48,52 @@ export function Scheduled() {
     .filter((x) => !needle || [x.name, category(x.categoryId).name].some((t) => (t || '').toLowerCase().includes(needle)))
     .sort((a, b) => new Date(a.date) - new Date(b.date));
   return (
-    <Screen pushed title="Запланированные платежи" back="Планы" onBack={nav.pop} right={<button class="link" onClick={() => setEdit(null)}>Добавить</button>}>
+    <Screen pushed title="Запланированные платежи" back="Назад" onBack={nav.pop}
+      right={<button class="round-add" aria-label="Добавить платёж" onClick={() => setEdit(null)}>+</button>}>
       <label class="search"><span aria-hidden="true">🔍</span><span class="sr-only">Поиск</span><input type="search" placeholder="Поиск" value={q} onInput={(e) => setQ(e.currentTarget.value)} /></label>
-      <div style={{ padding: '0 var(--s4) var(--s3)' }}><Segmented options={[['all', 'Все'], ['income', 'Доход'], ['expense', 'Расход']]} value={tab} onChange={setTab} /></div>
+      <div class="period-dock" style={{ bottom: 0 }}>
+        <Segmented options={[['all', 'Все'], ['income', 'Доход'], ['expense', 'Расход']]} value={tab} onChange={setTab} />
+      </div>
       {list.length === 0 && <Empty icon="⏰" text="Нет запланированных платежей"><button class="link strong" onClick={() => setEdit(null)}>Добавить платёж</button></Empty>}
       {list.length > 0 && (
-        <div class="list inset">
+        <div class="list">
           {list.map((x) => <PayRow key={x.id} x={x} onClick={() => nav.push(PaymentDetail, { id: x.id })} />)}
         </div>
       )}
+      <div style={{ height: 90 }} aria-hidden="true" />
       {edit !== undefined && <ScheduledForm item={edit} onClose={() => setEdit(undefined)} />}
     </Screen>
   );
 }
 
+const WEEKDAYS = ['воскресеньям', 'понедельникам', 'вторникам', 'средам', 'четвергам', 'пятницам', 'субботам'];
+/** "Каждый месяц, 19-го" / "Каждую неделю по средам" / "Каждый год, 19 ноября" / "Один раз" */
+export function repeatText(x) {
+  const d = new Date(x.date);
+  if (x.repeat === 'monthly') return `Каждый месяц, ${d.getDate()}-го`;
+  if (x.repeat === 'weekly') return `Каждую неделю по ${WEEKDAYS[d.getDay()]}`;
+  if (x.repeat === 'yearly') return `Каждый год, ${d.getDate()} ${MONTHS[d.getMonth()]}`;
+  return 'Один раз';
+}
+
 export function PayRow({ x, onClick }) {
+  const s = useStore();
   const n = daysUntil(x.date);
   const c = category(x.categoryId);
+  const acc = s.ledger.accounts.find((a) => a.id === x.accountId);
   return (
     <button class="row pay-row" onClick={onClick}>
-      <CatIcon catId={x.categoryId} size={38} />
+      <CatIcon catId={x.categoryId} size={44} />
       <span class="rl">
-        <span style={{ display: 'block', fontWeight: 600 }}>{x.name}</span>
-        <span class="muted" style={{ display: 'block' }}>{c.name}{x.repeat && x.repeat !== 'none' ? ` · ${x.repeat === 'monthly' ? 'каждый месяц' : x.repeat === 'weekly' ? 'каждую неделю' : 'каждый год'}` : ''}</span>
+        <span style={{ display: 'block', fontWeight: 600, fontSize: 'var(--fs-l)' }}>{x.name}</span>
+        <span style={{ display: 'block' }}>{c.name}</span>
+        <span class="muted" style={{ display: 'block', fontSize: 'var(--fs-s)' }}>{repeatText(x)}</span>
+        {acc && <span class="muted" style={{ display: 'block', fontSize: 'var(--fs-s)' }}>{accLabel(acc)}</span>}
       </span>
-      <span style={{ textAlign: 'right' }}>
-        <span class={`num ${x.type === 'income' ? 'pos-text' : 'neg-text'}`} style={{ display: 'block' }}>{rub(x.type === 'income' ? x.amount : -x.amount)}</span>
-        <span class={n <= 1 ? 'due-soon' : 'muted'} style={{ fontSize: 'var(--fs-xs)' }}>{dueText(n)}</span>
+      <span class="pay-side">
+        {n <= 1 && <span class="badge-dot inline" style={{ margin: 0 }}>1</span>}
+        <span class={`num ${x.type === 'income' ? 'pos-text' : ''}`} style={{ fontSize: 'var(--fs-l)' }}>{rub(x.type === 'income' ? x.amount : -x.amount)}</span>
+        <span class={n <= 1 ? 'due-soon' : 'muted'} style={{ fontSize: 'var(--fs-s)' }}>{dueText(n)}</span>
       </span>
     </button>
   );
