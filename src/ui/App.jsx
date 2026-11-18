@@ -11,6 +11,7 @@ import { Scan } from './Scan.jsx';
 import { Onboarding } from './Settings.jsx';
 import { duePayments } from './Payments.jsx';
 import { ShakeListener } from './Shake.jsx';
+import { autoPayDue } from './Payments.jsx';
 
 const Nav = createContext(null);
 export const useNav = () => useContext(Nav);
@@ -25,6 +26,7 @@ export function App() {
   useEffect(() => {
     if (syncConfigured()) syncNow(); else scheduleSync();
     refreshRates();
+    autoPayDue();
     // Each launch starts with your own records; the switch can show shared or the other person until the app is closed.
     const st = getState().settings;
     if (st.me && st.view !== st.me) updateSettings({ view: st.me });
@@ -33,7 +35,7 @@ export function App() {
     // Connection is back: send what was saved offline right away.
     const onOnline = () => { if (syncConfigured()) syncNow(); refreshRates(); };
     window.addEventListener('online', onOnline);
-    const t = setInterval(() => syncConfigured() && document.visibilityState === 'visible' && syncNow(), 60000);
+    const t = setInterval(() => { autoPayDue(); if (syncConfigured() && document.visibilityState === 'visible') syncNow(); }, 60000);
     return () => { document.removeEventListener('visibilitychange', onVis); window.removeEventListener('online', onOnline); clearInterval(t); };
   }, []);
 

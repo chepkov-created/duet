@@ -416,3 +416,6 @@ input, select, textarea { font: inherit; color: inherit; }
 .round-add { width: 40px; height: 40px; border-radius: var(--r-pill); background: var(--accent); color: #fff; font-size: 28px; line-height: 1; display: grid; place-items: center; }
 .pay-row { align-items: flex-start; padding-top: var(--s3); padding-bottom: var(--s3); }
 .pay-side { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; text-align: right; flex: none; }
+.row input.input-req::placeholder { color: var(--neg-text); opacity: 1; }
+.row select.req { color: var(--neg-text); }
+.row input.input-req.bad { box-shadow: inset 0 -2px 0 var(--neg); }

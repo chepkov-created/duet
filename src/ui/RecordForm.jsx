@@ -15,7 +15,7 @@ export const groupDigits = (raw) => {
 };
 
 /** Amount field: groups thousands while typing, keeps the caret in place, shrinks long numbers to fit. */
-function AmountInput({ value, onChange, cls, big, placeholder, autoFocus }) {
+export function AmountInput({ value, onChange, cls, big, placeholder, autoFocus }) {
   const shown = groupDigits(value);
   const base = big ? 64 : 40;
   const ref = useRef(null);
@@ -82,7 +82,7 @@ function ItemsBlock({ items, total, onChange, onUseSum, onPickCat }) {
 }
 import { toLocalInput } from '../data/format.js';
 
-const PAY = ['Наличные', 'Карта', 'Перевод', 'СБП', 'Онлайн'];
+export const PAY = ['Наличные', 'Карта', 'Перевод', 'СБП', 'Онлайн'];
 
 // fields a template carries over into a record
 const TEMPLATE_FIELDS = ['type', 'amount', 'toAmount', 'accountId', 'toAccountId', 'categoryId', 'owner', 'labels', 'note', 'payee', 'payment', 'nature'];
@@ -305,7 +305,7 @@ export function RecordForm({ record, defaults, template }) {
   );
 }
 
-function LabelsRow({ labels, onChange }) {
+export function LabelsRow({ labels, onChange }) {
   const [text, setText] = useState('');
   const add = () => { const t = text.trim(); if (t && !labels.includes(t)) onChange([...labels, t]); setText(''); };
   return (

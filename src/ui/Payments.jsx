@@ -22,12 +22,29 @@ export const myScheduled = (s = getState()) => alive(s.ledger.scheduled).filter(
 export const duePayments = (s = getState()) => myScheduled(s).filter((x) => daysUntil(x.date) <= 1).sort((a, b) => new Date(a.date) - new Date(b.date));
 
 /** Pay the nearest occurrence: a real record linked to the payment, then move to the next date. */
-export function payScheduled(x, amount = x.amount) {
+export function payScheduled(x, amount = x.amount, date = new Date().toISOString()) {
   upsert('records', {
+    // fixed id per occurrence: if both phones confirm the same payment, it is still one record
+    id: `sch-${x.id}-${x.date.slice(0, 10)}`,
     type: x.type, amount, accountId: x.accountId, categoryId: x.categoryId, owner: x.owner || getState().settings.me,
-    date: new Date().toISOString(), note: x.name, payee: '', labels: [], status: 'done', payment: 'Карта', scheduledId: x.id, dueDate: x.date,
+    date, note: x.note ? `${x.name} · ${x.note}` : x.name, payee: x.payee || '', labels: x.labels || [], status: 'done', payment: x.payment || 'Карта', scheduledId: x.id, dueDate: x.date,
   });
   advance(x);
+}
+/** Payments with «Автоматически»: on the due day the record is created by itself (on the owner's phone). */
+export function autoPayDue(s = getState()) {
+  let n = 0;
+  for (const x0 of alive(s.ledger.scheduled)) {
+    if (x0.confirm !== 'auto' || (x0.owner && x0.owner !== s.settings.me)) continue;
+    let x = x0;
+    for (let i = 0; i < 24 && x && daysUntil(x.date) <= 0; i++) {
+      payScheduled(x, x.amount, x.date);
+      n++;
+      const nd = nextDate(x.date, x.repeat);
+      x = nd ? { ...x, date: nd } : null;
+    }
+  }
+  return n;
 }
 export function skipScheduled(x) { advance({ ...x, skipped: [...(x.skipped || []), x.date] }); }
 function advance(x) {
@@ -166,6 +183,7 @@ export function notifications(s = getState()) {
   const dismissed = s.settings.dismissed || {};
   for (const x of duePayments(s)) {
     const n = daysUntil(x.date);
+    if (x.confirm === 'auto' || (n <= 0 && x.notifyDay === false)) continue;
     const key = `pay:${x.id}:${x.date.slice(0, 10)}`;
     if (dismissed[key]) continue;
     out.push({ key, icon: '⏰', title: n < 0 ? 'Платёж просрочен' : n === 0 ? 'Платёж подлежит оплате сегодня' : 'Платёж подлежит оплате завтра', text: `Не забудьте оплатить: ${x.name} · ${rub(x.amount)}`, date: x.date, pay: x.id });

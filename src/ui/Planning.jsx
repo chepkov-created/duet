@@ -7,7 +7,7 @@ import { AccountOptions } from './Accounts.jsx';
 import { category, group, EXPENSE_GROUPS } from '../data/categories.js';
 import { rub, toLocalInput, addMonths, addDays } from '../data/format.js';
 import { periodRange, inRange } from '../data/periods.js';
-import { CategoryPicker } from './RecordForm.jsx';
+import { CategoryPicker, AmountInput, LabelsRow, PAY } from './RecordForm.jsx';
 import { payScheduled, duePayments, myScheduled, Scheduled } from './Payments.jsx';
 
 export function Planning() {
@@ -46,31 +46,104 @@ export { Scheduled };
 export function ScheduledForm({ item, onClose }) {
   const s = useStore();
   const accounts = alive(s.ledger.accounts);
-  const [f, setF] = useState(item ? { ...item, amountText: String(item.amount) } : {
-    name: '', type: 'expense', amountText: '', accountId: accounts[0]?.id, categoryId: '', owner: s.settings.me,
-    date: addDays(new Date(), 1).toISOString(), repeat: 'monthly',
+  const [f, setF] = useState(item ? { notifyDay: true, notify3: true, confirm: 'manual', payment: 'Карта', labels: [], ...item, amountText: String(item.amount).replace('.', ',') } : {
+    name: '', type: 'expense', amountText: '', accountId: '', categoryId: '', owner: s.settings.me,
+    date: '', repeat: 'monthly', confirm: 'manual', payment: 'Карта', payee: '', labels: [], note: '', notifyDay: true, notify3: true,
   });
-  const [pick, setPick] = useState(false);
+  const [pick, setPick] = useState(null);
+  const [tried, setTried] = useState(false);
   const upd = (p) => setF((x) => ({ ...x, ...p }));
-  const amount = Number(String(f.amountText).replace(',', '.')) || 0;
-  const valid = amount > 0 && f.categoryId && f.accountId;
-  const toItem = () => { const { amountText, occ, ...rest } = f; return { ...rest, amount, name: f.name.trim() || category(f.categoryId).name }; };
-  const save = () => { if (!valid) return; upsert('scheduled', toItem()); onClose(); };
-  const payNow = () => { if (!valid) return; payScheduled(toItem()); onClose(); };
-  if (pick) return <CategoryPicker type={f.type} onPick={(id) => { upd({ categoryId: id }); setPick(false); }} onClose={() => setPick(false)} />;
+  const amount = Number(String(f.amountText).replace(/\s/g, '').replace(',', '.')) || 0;
+  const missing = [!amount && 'сумму', !f.name.trim() && 'название', !f.accountId && 'счёт', !f.categoryId && 'категорию', !f.date && 'дату'].filter(Boolean);
+  const valid = missing.length === 0;
+  const toItem = () => { const { amountText, occ, ...rest } = f; return { ...rest, amount, name: f.name.trim() }; };
+  const save = () => { setTried(true); if (!valid) return; upsert('scheduled', toItem()); onClose(); };
+  const payNow = () => { setTried(true); if (!valid) return; payScheduled(toItem()); onClose(); };
+  const acc = accounts.find((a) => a.id === f.accountId);
+  const c = f.categoryId ? category(f.categoryId) : null;
+  const req = (ok) => (ok ? '' : 'req');
+  if (pick === 'cat') return <CategoryPicker type={f.type} onPick={(id) => { upd({ categoryId: id }); setPick(null); }} onClose={() => setPick(null)} />;
   return (
-    <Sheet title={item ? 'Платёж' : 'Новый платёж'} onClose={onClose} right={<button class="link strong" onClick={save} disabled={!valid}>Готово</button>}
-      footer={item && <div style={{ display: 'grid', gap: 8 }}><button class="btn green" onClick={payNow}>Оплачено — записать</button><button class="btn danger" onClick={() => { remove('scheduled', item.id); onClose(); }}>Удалить</button></div>}>
-      <div style={{ padding: '0 var(--s4) var(--s3)' }}><Segmented light options={[['expense', 'Расход'], ['income', 'Доход']]} value={f.type} onChange={(type) => upd({ type, categoryId: '' })} /></div>
-      <div class="list">
-        <label class="row"><span class="rl">Название</span><input value={f.name} placeholder="Например, Комиссия банка" onInput={(e) => upd({ name: e.currentTarget.value })} /></label>
-        <label class="row"><span class="rl">Сумма, ₽</span><input inputMode="decimal" value={f.amountText} placeholder="0" onInput={(e) => upd({ amountText: e.currentTarget.value })} /></label>
-        <Row label="Категория" value={f.categoryId ? category(f.categoryId).name : 'Обязательно'} valueClass={f.categoryId ? '' : 'req'} onClick={() => setPick(true)} />
-        <label class="row"><span class="rl">Счёт</span><select value={f.accountId} onChange={(e) => upd({ accountId: e.currentTarget.value })}><AccountOptions accounts={accounts} me={s.settings.me} /></select></label>
-        <label class="row"><span class="rl">Ближайшая дата</span><input type="datetime-local" value={toLocalInput(f.date)} onInput={(e) => e.currentTarget.value && upd({ date: new Date(e.currentTarget.value).toISOString() })} /></label>
-        <label class="row"><span class="rl">Повтор</span><select value={f.repeat} onChange={(e) => upd({ repeat: e.currentTarget.value })}>{REPEAT.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
-        <div class="row"><span class="rl">Чей</span><div class="who">{PEOPLE.map((p) => <button key={p} class={f.owner === p ? 'on' : ''} onClick={() => upd({ owner: p })}><span style={{ color: PERSON_COLOR[p] }}>●</span> {p}</button>)}</div></div>
+    <Sheet title={item ? 'Платёж' : 'Новый платёж'} onClose={onClose}
+      left={<button class="link" onClick={onClose}>Отменить</button>}
+      footer={
+        <div style={{ display: 'grid', gap: 8 }}>
+          {tried && !valid && <div class="error-box" role="alert">Заполните: {missing.join(', ')}</div>}
+          <button class="btn primary" onClick={save}>Сохранить</button>
+          {item && <button class="btn green" onClick={payNow}>Оплачено — записать</button>}
+          {item && <button class="btn danger" onClick={() => { remove('scheduled', item.id); onClose(); }}>Удалить</button>}
+        </div>
+      }>
+      <div style={{ padding: '0 var(--s4) var(--s3)' }}>
+        <Segmented light options={[['expense', 'Расход'], ['income', 'Доход']]} value={f.type} onChange={(type) => upd({ type, categoryId: '' })} />
       </div>
+      <label class="amount-box">
+        <span class="cur">{acc?.currency || 'RUB'}</span>
+        <span class="sr-only">Сумма</span>
+        <AmountInput cls={f.type} big placeholder={f.type === 'expense' ? '-0' : '0'} autoFocus={!item} value={f.amountText} onChange={(v) => upd({ amountText: v })} />
+      </label>
+
+      <div class="group-label">Общие</div>
+      <div class="list">
+        <label class="row"><span class="ri" aria-hidden="true">🅃</span><span class="rl">Название платежа</span>
+          <input class={`input-req${tried && !f.name.trim() ? ' bad' : ''}`} value={f.name} placeholder="Обязательно" onInput={(e) => upd({ name: e.currentTarget.value })} maxLength={60} />
+        </label>
+        <label class="row"><span class="ri" aria-hidden="true">{acc ? <span class="dot" style={{ background: acc.color, width: 20, height: 20, display: 'inline-block' }} /> : '❓'}</span><span class="rl">Счёт</span>
+          <select class={req(f.accountId)} value={f.accountId} onChange={(e) => upd({ accountId: e.currentTarget.value })}>
+            {!f.accountId && <option value="">Обязательно</option>}
+            <AccountOptions accounts={accounts} me={s.settings.me} />
+          </select>
+        </label>
+        <Row icon={c ? <CatIcon catId={c.id} size={30} /> : <span class="cat-ico" style={{ background: 'var(--surface-2)', width: 30, height: 30, fontSize: 16 }}>?</span>}
+          label="Категория" value={c ? c.name : 'Обязательно'} valueClass={req(c)} onClick={() => setPick('cat')} />
+        <label class="row"><span class="ri" aria-hidden="true">✔️</span><span class="rl">Подтверждение
+          <span class="muted" style={{ display: 'block', fontSize: 'var(--fs-xs)' }}>{f.confirm === 'auto' ? 'В день оплаты запись создастся сама' : 'Вы сами отмечаете «Оплачено»'}</span></span>
+          <select value={f.confirm} onChange={(e) => upd({ confirm: e.currentTarget.value })}>
+            <option value="manual">Вручную</option>
+            <option value="auto">Автоматически</option>
+          </select>
+        </label>
+        <div class="row"><span class="ri" aria-hidden="true">👤</span><span class="rl">Чей</span>
+          <div class="who">{PEOPLE.map((p) => <button key={p} class={f.owner === p ? 'on' : ''} onClick={() => upd({ owner: p })}><span style={{ color: PERSON_COLOR[p] }}>●</span> {p}</button>)}</div>
+        </div>
+      </div>
+
+      <div class="group-label">Дата и повтор</div>
+      <div class="list">
+        <label class="row"><span class="ri" aria-hidden="true">📅</span><span class="rl">Дата</span>
+          <input type="date" class={req(f.date)} value={f.date ? toLocalInput(f.date).slice(0, 10) : ''}
+            onInput={(e) => { const v = e.currentTarget.value; if (v) { const d = new Date(`${v}T12:00`); upd({ date: d.toISOString() }); } }} />
+          {!f.date && <span class="rv req" aria-hidden="true" style={{ pointerEvents: 'none' }}>Обязательно</span>}
+        </label>
+        <label class="row"><span class="ri" aria-hidden="true">🔁</span><span class="rl">Повтор</span>
+          <select value={f.repeat} onChange={(e) => upd({ repeat: e.currentTarget.value })}>{REPEAT.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+        </label>
+      </div>
+
+      <div class="group-label">Подробнее</div>
+      <div class="list">
+        <label class="row"><span class="ri" aria-hidden="true">💳</span><span class="rl">Тип платежа</span>
+          <select value={f.payment} onChange={(e) => upd({ payment: e.currentTarget.value })}>{PAY.map((p) => <option key={p}>{p}</option>)}</select>
+        </label>
+        <label class="row"><span class="ri" aria-hidden="true">👤</span><span class="rl">Получатель</span>
+          <input value={f.payee || ''} placeholder="Необязательно" onInput={(e) => upd({ payee: e.currentTarget.value })} maxLength={80} />
+        </label>
+        <LabelsRow labels={f.labels || []} onChange={(labels) => upd({ labels })} />
+        <label class="row"><span class="ri" aria-hidden="true">✍️</span><span class="rl">Заметка</span>
+          <input value={f.note || ''} placeholder="Необязательно" onInput={(e) => upd({ note: e.currentTarget.value })} maxLength={140} />
+        </label>
+      </div>
+
+      <div class="group-label">Уведомления</div>
+      <div class="list">
+        {[['notifyDay', 'В день оплаты'], ['notify3', 'За 3 дня до даты оплаты']].map(([k, l]) => (
+          <button key={k} class="row" role="switch" aria-checked={f[k] !== false} onClick={() => upd({ [k]: f[k] === false })}>
+            <span class="ri" aria-hidden="true">🔔</span><span class="rl">{l}</span>
+            <span class={`toggle${f[k] !== false ? ' on' : ''}`} aria-hidden="true" />
+          </button>
+        ))}
+      </div>
+      <div style={{ height: 'var(--s4)' }} />
     </Sheet>
   );
 }
