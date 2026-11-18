@@ -7,8 +7,6 @@ import { Categories } from './Categories.jsx';
 import { checkAccess } from '../data/github.js';
 import { PushSettings } from './Push.jsx';
 import { ShakeSettings } from './Shake.jsx';
-import { PinSetup, switchPerson } from './Pin.jsx';
-import { profileOf } from '../data/store.js';
 
 export function Onboarding() {
   return (
@@ -18,7 +16,7 @@ export function Onboarding() {
       <p style={{ textAlign: 'center', color: 'var(--text-2)', margin: 0, lineHeight: 1.45 }}>Общий бюджет на двоих. Каждая запись помечена тем, кто её сделал, а смотреть можно и свои траты, и общие.</p>
       <div class="caption" style={{ textAlign: 'center' }}>Кто пользуется этим телефоном?</div>
       {PEOPLE.map((p) => (
-        <button key={p} class="btn" style={{ fontSize: 'var(--fs-xl)' }} onClick={() => switchPerson(p)}>
+        <button key={p} class="btn" style={{ fontSize: 'var(--fs-xl)' }} onClick={() => updateSettings({ me: p, view: p })}>
           <span style={{ color: PERSON_COLOR[p] }}>●</span> {p}
         </button>
       ))}
@@ -85,7 +83,6 @@ export function Settings() {
   const s = useStore();
   const nav = useNav();
   const st = s.settings;
-  const [pinOpen, setPinOpen] = useState(false);
   const exportJson = () => {
     const blob = new Blob([JSON.stringify(getState().ledger, null, 1)], { type: 'application/json' });
     const a = document.createElement('a');
@@ -110,9 +107,8 @@ export function Settings() {
       <div class="group-label">Этот телефон</div>
       <div class="list inset plain">
         <div class="row"><span class="rl">Я —</span>
-          <div class="who">{PEOPLE.map((p) => <button key={p} class={st.me === p ? 'on' : ''} onClick={() => p !== st.me && switchPerson(p)}><span style={{ color: PERSON_COLOR[p] }}>●</span> {p}{profileOf(p, s) ? ' 🔒' : ''}</button>)}</div>
+          <div class="who">{PEOPLE.map((p) => <button key={p} class={st.me === p ? 'on' : ''} onClick={() => updateSettings({ me: p, view: p })}><span style={{ color: PERSON_COLOR[p] }}>●</span> {p}</button>)}</div>
         </div>
-        <Row label="PIN профиля" value={profileOf(st.me, s) ? 'Задан · сменить' : 'Не задан'} valueClass={profileOf(st.me, s) ? '' : 'req'} onClick={() => setPinOpen(true)} />
         <Row label="Синхронизация" value={syncConfigured(st) ? 'GitHub' : 'Выключена'} onClick={() => nav.push(SyncScreen, {})} />
       </div>
 
@@ -144,7 +140,6 @@ export function Settings() {
         <Row label={<span class="accent">Заполнить примером</span>} chevron={false} onClick={() => confirm('Заменить данные на этом телефоне примером? При включённой синхронизации пример попадёт и в общий файл.') && loadDemo()} />
         <Row label={<span style={{ color: 'var(--neg-text)' }}>Очистить данные на телефоне</span>} chevron={false} onClick={() => confirm('Удалить все записи на этом телефоне? Данные в GitHub останутся и вернутся при следующей синхронизации.') && wipeLocal()} />
       </div>
-      {pinOpen && <PinSetup onClose={() => setPinOpen(false)} />}
     </Screen>
   );
 }

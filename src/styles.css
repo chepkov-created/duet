@@ -471,8 +471,3 @@ input, select, textarea { font: inherit; color: inherit; }
 .sec-caret { margin-left: auto; font-size: var(--fs-l); color: var(--text-2); }
 .sec-count { margin-left: auto; background: var(--surface-2); color: var(--text-2); border-radius: var(--r-pill); padding: 1px 8px; font-size: var(--fs-xs); }
 .sec-count + .sec-caret { margin-left: 8px; }
-/* PIN */
-.pin-field input { width: 100%; text-align: center; font-size: 26px; letter-spacing: 0.3em; padding: 14px; border-radius: var(--r-m); background: var(--surface-2); color: var(--text); border: 0; }
-.pin-field input::placeholder { font-size: var(--fs-m); letter-spacing: 0; color: var(--text-3); }
-.pin-gate { position: fixed; inset: 0; z-index: 200; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s4); padding: var(--s6); }
-.pin-gate .pin-field { width: 100%; max-width: 320px; }

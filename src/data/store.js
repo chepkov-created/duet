@@ -2,13 +2,11 @@ import { useEffect, useState } from 'preact/hooks';
 import { readLedger, writeLedger } from './github.js';
 import { uid } from './format.js';
 import { applyCategoryEdits, natureOfRecord } from './categories.js';
-import { sealMine, openMine, isLocked } from './crypto.js';
 
 const LEDGER_KEY = 'duet.ledger';
 const SETTINGS_KEY = 'duet.settings';
 // `categories` holds the family's renames/new/hidden categories; it syncs like everything else.
-// `profiles`: each person's PIN-locked key (see crypto.js).
-const COLLECTIONS = ['accounts', 'records', 'scheduled', 'budgets', 'templates', 'categories', 'devices', 'profiles'];
+const COLLECTIONS = ['accounts', 'records', 'scheduled', 'budgets', 'templates', 'categories', 'devices'];
 
 export const PEOPLE = ['Миша', 'Арина'];
 
@@ -38,8 +36,6 @@ const emptyLedger = () => ({
   budgets: [],
   templates: [],
   categories: [],
-  devices: [],
-  profiles: [],
 });
 
 const defaultSettings = () => ({
@@ -109,8 +105,7 @@ export function updateSettings(patch) {
 export const syncConfigured = (s = state.settings) => Boolean(s.ghOwner && s.ghRepo && s.ghToken && s.ghPath);
 
 /* ---------- ledger mutations ---------- */
-// The other person's sealed secrets are not records for this phone at all: no list, no total, no balance.
-const live = (arr) => (arr || []).filter((x) => !x.deleted && !isLocked(x));
+const live = (arr) => arr.filter((x) => !x.deleted);
 export const alive = live;
 
 function commit(ledger) {
@@ -121,7 +116,7 @@ function commit(ledger) {
 
 export function upsert(collection, item) {
   const now = Date.now();
-  const list = state.ledger[collection] || [];
+  const list = state.ledger[collection];
   const next = { ...item, id: item.id || uid(), updatedAt: now, by: state.settings.me || undefined };
   const idx = list.findIndex((x) => x.id === next.id);
   const copy = idx >= 0 ? list.map((x, i) => (i === idx ? next : x)) : [...list, next];
@@ -131,7 +126,7 @@ export function upsert(collection, item) {
 
 export function upsertMany(collection, items) {
   const now = Date.now();
-  const map = new Map((state.ledger[collection] || []).map((x) => [x.id, x]));
+  const map = new Map(state.ledger[collection].map((x) => [x.id, x]));
   for (const it of items) {
     const next = { ...it, id: it.id || uid(), updatedAt: now, by: state.settings.me || undefined };
     map.set(next.id, next);
@@ -205,13 +200,10 @@ export async function syncNow() {
     for (let attempt = 0; attempt < 4; attempt++) {
       const { data: remote, sha } = await readLedger(cfg);
       const merged = mergeLedgers(remote, state.ledger);
-      merged.records = await openMine(merged.records, s.me); // my own secrets: readable again on my phone
       if (!sameLedger(merged, state.ledger)) { persist(LEDGER_KEY, merged); set({ ledger: merged }); }
-      // What goes to the shared file: my secrets sealed with my key.
-      const out = { ...merged, records: await sealMine(merged.records, s.me) };
-      if (remote && sameLedger(mergeLedgers(remote, {}), out)) return; // nothing new to push
+      if (remote && sameLedger(mergeLedgers(remote, {}), merged)) return; // nothing new to push
       try {
-        await writeLedger(cfg, out, sha, `${s.me || 'устройство'}: обновление ${new Date().toLocaleString('ru-RU')}`);
+        await writeLedger(cfg, merged, sha, `${s.me || 'устройство'}: обновление ${new Date().toLocaleString('ru-RU')}`);
         return;
       } catch (e) {
         if (e.status === 409 || e.status === 422) continue; // someone wrote in between: re-read and merge again
@@ -369,11 +361,3 @@ export function loadDemo() {
 export function wipeLocal() {
   replaceLedger(emptyLedger());
 }
-
-/** After the PIN is entered on this phone: open my sealed secrets that are already here. */
-export async function reopenSecrets() {
-  const records = await openMine(state.ledger.records, state.settings.me);
-  if (records !== state.ledger.records) { const ledger = { ...state.ledger, records }; persist(LEDGER_KEY, ledger); set({ ledger }); }
-}
-/** This person's PIN profile, if they have set one. */
-export const profileOf = (person, s = state) => live(s.ledger.profiles || []).find((p) => p.id === person) || null;
