@@ -1,7 +1,8 @@
 import { useState, useRef, useLayoutEffect } from 'preact/hooks';
 import { useNav } from './App.jsx';
 import { Sheet, Segmented, Row, CatIcon, PERSON_COLOR } from './kit.jsx';
-import { useStore, alive, upsert, remove, undoDelete, updateSettings, otherPerson, PEOPLE, CURRENCIES } from '../data/store.js';
+import { useStore, alive, upsert, remove, undoDelete, updateSettings, otherPerson, accountBalance, PEOPLE, CURRENCIES } from '../data/store.js';
+import { fmt } from '../data/format.js';
 import { accountSections, accLabel } from './Accounts.jsx';
 import { TemplatePicker } from './Templates.jsx';
 import { DateTimeSheet, dateTimeText } from './DatePick.jsx';
@@ -156,6 +157,17 @@ export function RecordForm({ record, defaults, template }) {
   };
   const save = () => {
     if (isTpl) return saveTemplate();
+    if (isAdjust) {
+      if (!f.accountId) return setError('Выберите счёт');
+      if (String(f.amountText).trim() === '') return setError('Введите, сколько на счёте на самом деле');
+      if (!adjDiff) return setError('Баланс уже такой — менять нечего');
+      upsert('records', {
+        type: adjDiff > 0 ? 'income' : 'expense', amount: Math.abs(adjDiff), accountId: f.accountId, categoryId: 'adj.0',
+        date: new Date().toISOString(), owner: f.owner, labels: [], note: f.note?.trim() || 'Изменение баланса счёта', payee: '', status: 'done', payment: '',
+      });
+      nav.toast(`Баланс «${acc(f.accountId).name}» исправлен: ${fmt(adjDiff, fromCur, { sign: true })}`);
+      return nav.closeSheet();
+    }
     if (!amount) return setError('Введите сумму');
     if (f.type !== 'transfer' && !f.categoryId) return setError('Выберите категорию');
     if (!f.accountId) return setError('Выберите счёт');
@@ -174,6 +186,10 @@ export function RecordForm({ record, defaults, template }) {
   };
 
   const c = f.categoryId ? category(f.categoryId) : null;
+  // «Баланс»: type what is really on the account, the difference becomes «Изменение баланса счёта» (not counted as spending or income).
+  const isAdjust = f.type === 'adjust';
+  const adjCurrent = isAdjust && f.accountId ? accountBalance(acc(f.accountId), alive(s.ledger.records)) : 0;
+  const adjDiff = isAdjust && String(f.amountText).trim() !== '' ? Math.round((amount - adjCurrent) * 100) / 100 : 0;
 
   if (picker === 'tpl') {
     return <TemplatePicker onClose={() => setPicker(null)} onFill={(t) => {
@@ -219,7 +235,7 @@ export function RecordForm({ record, defaults, template }) {
       footer={
         <div style={{ display: 'grid', gap: 8 }}>
           <button class="btn primary" onClick={save}>{isTpl ? 'Сохранить шаблон' : 'Сохранить'}</button>
-          {!isTpl && <button class="link" style={{ padding: 6 }} onClick={saveAsTemplate}>Сохранить как шаблон</button>}
+          {!isTpl && f.type !== 'adjust' && <button class="link" style={{ padding: 6 }} onClick={saveAsTemplate}>Сохранить как шаблон</button>}
         </div>
       }
     >
@@ -237,15 +253,26 @@ export function RecordForm({ record, defaults, template }) {
         </div>
       )}
       <div style={{ padding: '0 var(--s4) var(--s3)' }}>
-        <Segmented light options={[['expense', 'Расход'], ['income', 'Доход'], ['transfer', 'Перевод']]} value={f.type}
+        <Segmented light options={[['expense', 'Расход'], ['income', 'Доход'], ['transfer', 'Перевод'], ...(!record && !isTpl ? [['adjust', 'Баланс']] : [])]} value={f.type}
           onChange={(type) => upd({ type, categoryId: c && c.type === (type === 'income' ? 'income' : 'expense') ? f.categoryId : '' })} />
       </div>
+      {isAdjust && (
+        <div class="note-box">Пересчитали деньги и не сходится? Введите, сколько на счёте <b>на самом деле</b>. Разница запишется как «Изменение баланса счёта» и не попадёт ни в траты, ни в доходы.</div>
+      )}
       <label class="amount-box">
         <span class="cur">{fromCur}</span>
-        <span class="sr-only">Сумма</span>
-        <AmountInput cls={f.type} big placeholder={isTpl ? 'любая' : f.type === 'expense' ? '-0' : '0'} autoFocus={!record && !isTpl}
-          value={f.amountText} onChange={(v) => { upd({ amountText: v }); setError(''); }} />
+        <span class="sr-only">{isAdjust ? 'Сколько на счёте на самом деле' : 'Сумма'}</span>
+        {isAdjust ? (
+          <AmountInput cls="transfer" big placeholder={String(Math.round(adjCurrent * 100) / 100).replace('.', ',')} autoFocus
+            value={f.amountText} onChange={(v) => { upd({ amountText: v }); setError(''); }} />
+        ) : <AmountInput cls={f.type} big placeholder={isTpl ? 'любая' : f.type === 'expense' ? '-0' : '0'} autoFocus={!record && !isTpl}
+          value={f.amountText} onChange={(v) => { upd({ amountText: v }); setError(''); }} />}
       </label>
+      {isAdjust && f.accountId && (
+        <div class="note-box">В приложении сейчас: <b class="num">{fmt(adjCurrent, fromCur)}</b>
+          {adjDiff !== 0 && <> · будет записано <b class="num" style={{ color: adjDiff > 0 ? 'var(--pos-text)' : 'var(--neg-text)' }}>{fmt(adjDiff, fromCur, { sign: true })}</b></>}
+        </div>
+      )}
       {exchange && (
         <label class="amount-box" style={{ borderTop: '1px solid var(--line)' }}>
           <span class="cur">{toCur}</span>
@@ -261,13 +288,13 @@ export function RecordForm({ record, defaults, template }) {
       <div class="group-label">Основное</div>
       <div class="list">
         <Row icon={<span class="dot" style={{ background: acc(f.accountId)?.color, width: 20, height: 20 }} />} label={f.type === 'transfer' ? 'Со счёта' : 'Счёт'} value={f.accountId ? accLabel(acc(f.accountId)) : 'Выбрать'} onClick={() => setPicker('acc')} />
-        {f.type === 'transfer' ? (
+        {isAdjust ? null : f.type === 'transfer' ? (
           <Row icon="⇄" label="На счёт" value={f.toAccountId ? accLabel(acc(f.toAccountId)) : 'Выбрать'} onClick={() => setPicker('to')} />
         ) : (
           <Row icon={c ? <CatIcon catId={c.id} size={30} /> : <span class="cat-ico" style={{ background: 'var(--surface-2)', width: 30, height: 30, fontSize: 16 }}>?</span>}
             label="Категория" value={c ? c.name : 'Обязательно'} valueClass={c ? '' : 'req'} onClick={() => setPicker('cat')} />
         )}
-        {!isTpl && (
+        {!isTpl && !isAdjust && (
           <Row icon="📅" label="Дата и время" value={dateTimeText(f.date || new Date().toISOString())} onClick={() => setPicker('date')} />
         )}
         <div class="row"><span class="ri" aria-hidden="true">👤</span><span class="rl">Чья запись</span>
@@ -279,6 +306,12 @@ export function RecordForm({ record, defaults, template }) {
         </div>
       </div>
 
+      {isAdjust && (
+        <div class="list" style={{ marginTop: 'var(--s5)' }}>
+          <label class="row"><span class="ri" aria-hidden="true">✍️</span><span class="rl">Заметка</span><input value={f.note} placeholder="Например, пересчитали наличные" onInput={(e) => upd({ note: e.currentTarget.value })} maxLength={140} /></label>
+        </div>
+      )}
+      {!isAdjust && <>
       <div class="group-label">Подробнее</div>
       <div class="list">
         <label class="row"><span class="ri" aria-hidden="true">✍️</span><span class="rl">Заметка</span><input value={f.note} placeholder="Необязательно" onInput={(e) => upd({ note: e.currentTarget.value })} maxLength={140} /></label>
@@ -323,6 +356,7 @@ export function RecordForm({ record, defaults, template }) {
           </label>
         )}
       </div>
+      </>}
       {(record || tplObj) && <div style={{ padding: 'var(--s6) var(--s4) 0' }}><button class="btn danger" onClick={del}>{tplObj ? 'Удалить шаблон' : 'Удалить запись'}</button></div>}
     </Sheet>
   );
