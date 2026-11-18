@@ -5,7 +5,8 @@ import { useStore, alive, upsertMany, PEOPLE } from '../data/store.js';
 import { category } from '../data/categories.js';
 import { rub, dayLabel, uid, sameDay } from '../data/format.js';
 import { readScreenshots } from '../ai/ocr.js';
-import { parseBankText, categoryMemory } from '../ai/parse.js';
+import { parseBankText, categoryMemory, normPayee } from '../ai/parse.js';
+import { readQR, parseQR, parseReceiptText } from '../ai/receipt.js';
 import { CategoryPicker, defaultAccount } from './RecordForm.jsx';
 import { AccountOptions } from './Accounts.jsx';
 
@@ -14,7 +15,7 @@ export function Scan() {
   const s = useStore();
   const nav = useNav();
   const accounts = alive(s.ledger.accounts);
-  const [mode, setMode] = useState('photo'); // photo | text
+  const [mode, setMode] = useState('photo'); // photo | receipt | text
   const [files, setFiles] = useState([]);
   const [text, setText] = useState('');
   const [stage, setStage] = useState('pick'); // pick | busy | review
@@ -37,8 +38,51 @@ export function Scan() {
     });
   };
 
+  /** Receipt photo → QR (date, total) + text (goods) → the record form, or the goods added to the bank record of that purchase. */
+  const runReceipt = async () => {
+    const file = files[0];
+    setStage('busy');
+    setProgress('Ищу QR-код…');
+    const qr = parseQR(await readQR(file).catch(() => null));
+    let text = '';
+    try {
+      text = await readScreenshots([file], ({ stage: st, p }) => setProgress(st === 'load' ? 'Загружаю распознавание (первый раз ~15 МБ)…' : `Читаю чек… ${Math.round(p * 100)}%`));
+    } catch { /* no internet the first time: the QR is still enough for the total */ }
+    const r = parseReceiptText(text);
+    const r2 = (v) => Math.round(v * 100) / 100;
+    const itemsSum = r2(r.items.reduce((a, it) => a + it.sum, 0));
+    const amount = qr?.amount || r.total || itemsSum;
+    if (!amount) {
+      setError(qr === null && !text ? 'Не получилось прочитать чек. Сфотографируйте ровнее и ближе, при хорошем свете.' : 'Не нашёл на чеке ни QR-кода, ни суммы. Попробуйте фото поближе, чтобы QR-код был чётким.');
+      setStage('pick');
+      return;
+    }
+    const date = qr?.date || r.date || new Date().toISOString();
+    const items = r.items.map((it) => ({ name: it.name, qty: String(it.qty).replace('.', ','), price: String(it.price).replace('.', ','), sum: it.sum }));
+    const existing = alive(s.ledger.records);
+    if (qr?.id) {
+      const same = existing.find((x) => x.receipt === qr.id);
+      if (same) { nav.toast('Этот чек уже добавлен'); nav.record(same); return; }
+    }
+    // The bank screenshot may already have this purchase: then just add the goods to it.
+    const near = existing.filter((x) => x.type === 'expense' && !(x.items || []).length && Math.abs(x.amount - amount) <= 1 && Math.abs(new Date(x.date) - new Date(date)) < 36 * 3600e3);
+    const hit = near.sort((a, b) => Math.abs(new Date(a.date) - new Date(date)) - Math.abs(new Date(b.date) - new Date(date)))[0];
+    if (hit && confirm(`Нашлась запись «${hit.payee || category(hit.categoryId).name}» на ${rub(-hit.amount)} (${dayLabel(hit.date).toLowerCase()}). Добавить позиции чека к ней?`)) {
+      nav.record(hit, { items, receipt: qr?.id });
+      return;
+    }
+    const memory = categoryMemory(existing);
+    const shopKey = normPayee(r.shop || '');
+    const known = shopKey && [...memory.entries()].find(([k]) => k && (k.includes(shopKey) || shopKey.includes(k)));
+    nav.record(null, {
+      type: qr?.type || 'expense', amount, date, items, receipt: qr?.id, payee: r.shop,
+      categoryId: known ? known[1] : 'food.0', note: items.length ? '' : 'по чеку',
+    });
+  };
+
   const run = async () => {
     setError('');
+    if (mode === 'receipt') return runReceipt();
     if (mode === 'text') {
       setRawText(text);
       setItems(toItems(text));
@@ -82,10 +126,10 @@ export function Scan() {
   const sum = items.filter((x) => x.on).reduce((a, x) => a + (x.type === 'income' ? x.amount : -x.amount), 0);
 
   return (
-    <Sheet title="Скриншот → записи" onClose={nav.closeSheet}
+    <Sheet title={mode === 'receipt' ? 'Чек → запись' : 'Скриншот → записи'} onClose={nav.closeSheet}
       left={stage === 'review' ? <button class="link" onClick={() => setStage('pick')}>Назад</button> : undefined}
       footer={
-        stage === 'pick' ? <button class="btn primary" disabled={mode === 'photo' ? !files.length : !text.trim()} onClick={run}>Распознать</button>
+        stage === 'pick' ? <button class="btn primary" disabled={mode === 'text' ? !text.trim() : !files.length} onClick={run}>Распознать</button>
           : stage === 'review' ? <button class="btn green" disabled={!count} onClick={save}>Добавить {count} {count === 1 ? 'запись' : count > 1 && count < 5 ? 'записи' : 'записей'} · {rub(sum)}</button>
           : null
       }>
@@ -94,9 +138,25 @@ export function Scan() {
       {stage === 'pick' && (
         <>
           <div style={{ padding: '0 var(--s4) var(--s3)' }}>
-            <Segmented light options={[['photo', 'Скриншот'], ['text', 'Вставить текст']]} value={mode} onChange={setMode} />
+            <Segmented light options={[['photo', 'Банк'], ['receipt', 'Чек'], ['text', 'Текст']]} value={mode} onChange={(m) => { setMode(m); setFiles([]); setError(''); }} />
           </div>
-          {mode === 'photo' ? (
+          {mode === 'receipt' ? (
+            <>
+              <div class="note-box">Фото бумажного чека или скриншот электронного. Из QR-кода берутся точные сумма, дата и время, а товары — из текста чека. Если такая покупка уже есть (например, со скриншота банка), позиции добавятся к ней.</div>
+              {files.length > 0 && (
+                <div class="thumbs">
+                  <div class="th"><img src={URL.createObjectURL(files[0])} alt="Чек" /><button class="x" aria-label="Убрать" onClick={() => setFiles([])}>✕</button></div>
+                </div>
+              )}
+              <div style={{ padding: 'var(--s4)' }}>
+                <label class="btn" style={{ display: 'block', textAlign: 'center' }}>
+                  {files.length ? 'Другой чек' : '🧾 Сфотографировать или выбрать чек'}
+                  <input type="file" accept="image/*" class="sr-only" onChange={(e) => e.currentTarget.files[0] && setFiles([e.currentTarget.files[0]])} />
+                </label>
+              </div>
+              <div class="note-box">Совет: чек целиком, ровно, без бликов. QR-код — самое надёжное: даже если товары прочитаются плохо, сумма и время будут точными.</div>
+            </>
+          ) : mode === 'photo' ? (
             <>
               <div class="note-box">Скриншот списка операций из приложения банка. Можно несколько сразу. Распознавание идёт прямо на телефоне, бесплатно.</div>
               {files.length > 0 && (

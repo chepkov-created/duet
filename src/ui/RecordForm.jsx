@@ -117,10 +117,14 @@ export function RecordForm({ record, defaults, template }) {
   const base = tplObj || stored;
   const numText = (n) => (n || n === 0 ? String(n).replace('.', ',') : '');
   const myDefault = defaultAccount(accounts, s.settings);
-  const [f, setF] = useState(() => base ? { name: '', ...base, amountText: base.amount ? numText(base.amount) : '', toAmountText: numText(base.toAmount) } : {
+  // From a receipt: its goods (and date, shop, receipt id) come in `defaults`, also when added to an existing record.
+  const fromReceipt = defaults?.items ? { items: defaults.items, ...(defaults.receipt ? { receipt: defaults.receipt } : {}) } : {};
+  const [f, setF] = useState(() => base ? { name: '', ...base, ...fromReceipt, amountText: base.amount ? numText(base.amount) : '', toAmountText: numText(base.toAmount) } : {
     type: 'expense', amountText: '', toAmountText: '', accountId: myDefault, toAccountId: accounts.find((a) => a.id !== myDefault)?.id,
     categoryId: '', date: new Date().toISOString(), owner: s.settings.me, labels: [], note: '', payee: '',
     payment: 'Карта', status: 'done', name: '', ...(defaults ? pickTemplate(defaults) : {}),
+    ...(defaults?.date && new Date(defaults.date) <= new Date() ? { date: defaults.date } : {}),
+    ...fromReceipt,
     amountText: defaults?.amount ? numText(defaults.amount) : '',
   });
   const [picker, setPicker] = useState(null); // 'cat' | 'acc' | 'to'
@@ -344,12 +348,59 @@ export function defaultAccount(accounts, settings) {
   return (mine.find((a) => a.kind === 'bank') || mine[0] || accounts[0])?.id;
 }
 
+// Everyday words people type that aren't in the category name.
+const CAT_WORDS = {
+  'Продукты': 'супермаркет магазин пятерочка магнит перекресток лента ашан вкусвилл',
+  'Рестораны, фастфуд': 'кафе кофе кофейня ресторан столовая обед доставка еды бургер пицца суши',
+  'Напитки, бары': 'бар пиво алкоголь вино',
+  'Топливо': 'бензин заправка азс дизель газ',
+  'Парковка': 'стоянка',
+  'Обслуживание авто': 'сто шиномонтаж мойка автомойка ремонт машины',
+  'Общественный транспорт': 'метро автобус электричка проезд тройка',
+  'Такси': 'яндекс go uber',
+  'Коммунальные платежи': 'жку жкх квартплата свет электричество вода газ отопление',
+  'Аренда': 'квартира съем',
+  'Врачи, медицина': 'аптека лекарства больница клиника анализы стоматолог зубы',
+  'Уход, красота': 'парикмахер стрижка маникюр барбер косметолог',
+  'Спорт, фитнес': 'зал тренажерный бассейн тренировка',
+  'Мобильная связь': 'телефон сотовая мтс мегафон билайн теле2',
+  'Интернет': 'провайдер wifi',
+  'Софт, приложения, игры': 'подписка игры приложение стриминг кино музыка',
+  'Одежда и обувь': 'одежда обувь кроссовки',
+  'Здоровье и красота': 'косметика аптека',
+  'Для дома': 'хозтовары посуда мебель',
+  'Электроника, бытовая техника': 'техника телефон ноутбук наушники',
+  'Подарки': 'подарок день рождения',
+  'Комиссии, сборы': 'комиссия банк обслуживание',
+  'Доставка': 'курьер сдэк почта озон wb',
+  'Зарплата': 'зп аванс',
+};
+
 export function CategoryPicker({ type, onPick, onClose }) {
   const [open, setOpen] = useState(null);
+  const [q, setQ] = useState('');
   const groups = type === 'income' ? INCOME_GROUPS : EXPENSE_GROUPS;
+  const needle = q.trim().toLowerCase().replace(/ё/g, 'е');
+  const norm = (t) => t.toLowerCase().replace(/ё/g, 'е');
+  // Search: every subcategory whose own name or group name contains the words typed.
+  const found = needle ? groups.flatMap((g) => g.cats.filter(({ name }) => needle.split(/\s+/).every((w) => norm(`${name} ${g.name} ${CAT_WORDS[name] || ''}`).includes(w))).map((c) => ({ ...c, g }))) : [];
   return (
     <Sheet title="Категория" onClose={onClose} left={<button class="link" onClick={onClose}>Назад</button>}>
-      <div class="list">
+      <label class="search" style={{ marginTop: 0 }}><span aria-hidden="true">🔍</span><span class="sr-only">Поиск категории</span>
+        <input type="search" placeholder="Поиск категории" value={q} onInput={(e) => setQ(e.currentTarget.value)} />
+      </label>
+      {needle && (
+        <div class="list">
+          {found.length === 0 && <div class="note-box">Ничего не нашлось. Новую категорию можно создать в «Ещё → Категории».</div>}
+          {found.map(({ id, name, g }) => (
+            <button key={id} class="row" onClick={() => onPick(id)}>
+              <CatIcon catId={id} size={32} />
+              <span class="rl">{id === `${g.id}.0` ? `${name} (общее)` : name}<span class="muted" style={{ display: 'block', fontSize: 'var(--fs-xs)' }}>{g.name}</span></span>
+            </button>
+          ))}
+        </div>
+      )}
+      {!needle && <div class="list">
         {groups.map((g) => (
           <div key={g.id}>
             <button class="cat-group-title" aria-expanded={open === g.id || groups.length === 1} onClick={() => setOpen(open === g.id ? null : g.id)}>
@@ -364,7 +415,7 @@ export function CategoryPicker({ type, onPick, onClose }) {
             ))}
           </div>
         ))}
-      </div>
+      </div>}
     </Sheet>
   );
 }

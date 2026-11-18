@@ -180,3 +180,4 @@ export function categoryMemory(records) {
   for (const r of sorted) mem.set(norm(r.payee), r.categoryId);
   return mem;
 }
+export { norm as normPayee };
