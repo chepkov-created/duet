@@ -1,11 +1,12 @@
 import { useState, useRef, useLayoutEffect } from 'preact/hooks';
 import { useNav } from './App.jsx';
 import { Sheet, Segmented, Row, CatIcon, PERSON_COLOR } from './kit.jsx';
-import { useStore, alive, upsert, remove, undoDelete, updateSettings, otherPerson, accountBalance, PEOPLE, CURRENCIES } from '../data/store.js';
+import { useStore, alive, upsert, remove, undoDelete, updateSettings, otherPerson, accountBalance, profileOf, PEOPLE, CURRENCIES } from '../data/store.js';
 import { fmt } from '../data/format.js';
 import { accountSections, accLabel } from './Accounts.jsx';
 import { TemplatePicker } from './Templates.jsx';
 import { DateTimeSheet, dateTimeText } from './DatePick.jsx';
+import { PinSetup } from './Pin.jsx';
 import { category, allowsItems, EXPENSE_GROUPS, INCOME_GROUPS, NATURES, natureOf } from '../data/categories.js';
 
 /** "2400000,5" -> "2 400 000,5" (narrow no-break spaces between thousands). */
@@ -129,7 +130,8 @@ export function RecordForm({ record, defaults, template }) {
     amountText: defaults?.amount ? numText(defaults.amount) : '',
   });
   const [picker, setPicker] = useState(null); // 'cat' | 'acc' | 'to'
-  const [openSecs, setOpenSecs] = useState(null); // account picker: unfolded sections of the other person / shared
+  const [openSecs, setOpenSecs] = useState(null);
+  const [pinFor, setPinFor] = useState(false); // secret switched on before a PIN exists // account picker: unfolded sections of the other person / shared
   const [error, setError] = useState('');
   const upd = (patch) => setF((x) => ({ ...x, ...patch }));
   const num = (t) => Number(String(t || '').replace(/\s/g, '').replace(',', '.')) || 0;
@@ -348,7 +350,7 @@ export function RecordForm({ record, defaults, template }) {
         })()}
         <LabelsRow labels={f.labels || []} onChange={(labels) => upd({ labels })} />
         {!isTpl && (
-          <button class="row" role="switch" aria-checked={Boolean(f.secretFrom)} onClick={() => upd({ secretFrom: f.secretFrom ? '' : otherPerson(s) })}>
+          <button class="row" role="switch" aria-checked={Boolean(f.secretFrom)} onClick={() => { if (!f.secretFrom && !profileOf(s.settings.me, s)) { setPinFor(true); return; } upd({ secretFrom: f.secretFrom ? '' : otherPerson(s) }); }}>
             <span class="ri" aria-hidden="true">🤫</span>
             <span class="rl">Секрет от {f.secretFrom || otherPerson(s)}
               <span class="muted" style={{ display: 'block', fontSize: 'var(--fs-xs)' }}>Для сюрпризов: {f.secretFrom || otherPerson(s)} не увидит эту запись</span>
@@ -369,6 +371,7 @@ export function RecordForm({ record, defaults, template }) {
         )}
       </div>
       </>}
+      {pinFor && <PinSetup onClose={() => setPinFor(false)} onDone={() => upd({ secretFrom: otherPerson(s) })} />}
       {(record || tplObj) && <div style={{ padding: 'var(--s6) var(--s4) 0' }}><button class="btn danger" onClick={del}>{tplObj ? 'Удалить шаблон' : 'Удалить запись'}</button></div>}
     </Sheet>
   );

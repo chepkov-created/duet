@@ -11,6 +11,7 @@ import { Scan } from './Scan.jsx';
 import { Onboarding } from './Settings.jsx';
 import { duePayments } from './Payments.jsx';
 import { ShakeListener } from './Shake.jsx';
+import { PinGate } from './Pin.jsx';
 import { autoPayDue } from './Payments.jsx';
 
 const Nav = createContext(null);
@@ -74,6 +75,7 @@ export function App() {
         </nav>
       )}
       <ShakeListener toast={nav.toast} />
+      <PinGate />
       {sheet && <sheet.C {...sheet.props} />}
       {toast && (
         <div class="toast" role="status">
