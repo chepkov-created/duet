@@ -16,6 +16,7 @@ import { QuickTemplates } from './Templates.jsx';
 import { BellButton, PayRow, PaymentDetail, myScheduled } from './Payments.jsx';
 import { ExpenseExplorer, ExpensesScreen, BalanceScreen, CashFlowScreen } from './Analytics.jsx';
 import { FilterBar, FilterButton } from './Filter.jsx';
+import { SortableStack } from './Sortable.jsx';
 
 export function Overview() {
   const s = useStore();
@@ -43,10 +44,9 @@ export function Overview() {
     >
       <div style={{ padding: '0 var(--s4)' }}><PersonSwitch /></div>
       <FilterBar />
-      <div class="stack">
-        <AccountsGrid accounts={accounts} records={all} />
-
-        {!s.settings.hidePromo && (
+      <SortableStack order={s.settings.widgets} onOrder={(widgets) => updateSettings({ widgets })} items={[
+        { key: 'accounts', node: <div style={{ display: 'grid', gap: 'var(--s5)' }}><AccountsGrid accounts={accounts} records={all} /></div> },
+        !s.settings.hidePromo && { key: 'promo', node: (
           <div class="promo">
             <div class="p-ico" aria-hidden="true">📸</div>
             <div>
@@ -56,52 +56,55 @@ export function Overview() {
             <button aria-label="Скрыть подсказку" onClick={() => updateSettings({ hidePromo: true })} style={{ color: 'var(--text-2)', fontSize: 20 }}>✕</button>
             <button class="ghost-btn full" onClick={nav.scan}>Загрузить скриншот</button>
           </div>
-        )}
-
-        <QuickTemplates />
-
-        <Card title="Денежный поток" menu={<Menu items={[['Открыть отчёт', () => nav.push(Reports, { pushed: true })]]} />} onMore={() => nav.push(CashFlowScreen, {})}>
-          <div class="caption">Этот месяц</div>
-          <div class="big-amount num">{rub(t.flow)}</div>
-          <div class="bar-row">
-            <div class="bar-label"><span>Доход</span><span class="num">{rub(t.income)}</span></div>
-            <Bar value={t.income} max={Math.max(t.income, t.expense)} color="var(--pos)" />
-          </div>
-          <div class="bar-row">
-            <div class="bar-label"><span>Расходы</span><span class="num">{rub(t.expense)}</span></div>
-            <Bar value={t.expense} max={Math.max(t.income, t.expense)} color="var(--neg)" />
-          </div>
-        </Card>
-
-        <Card title="Динамика баланса" menu={<Menu items={[['Все счета', () => nav.push(Accounts, { pushed: true })]]} />} onMore={() => nav.push(BalanceScreen, {})}>
-          <div class="caption">Сегодня{s.settings.view !== 'all' ? ` · счета: ${s.settings.view}` : ' · все счета в рублях'}</div>
-          <div class="big-amount num">{rub(totalBalance)}</div>
-          <Area series={series} />
-          <div class="legend"><i /> Баланс всех счетов</div>
-        </Card>
-
-        <ExpensesCard recs={recs} range={month} />
-
-        <Card title="Последние записи" menu={<Menu items={[['Все записи', () => nav.push(Records, { pushed: true })]]} />} onMore={() => nav.push(Records, { pushed: true })}>
-          {recs.length === 0 ? (
-            <Empty icon="🧾" text="Записей пока нет"><button class="link strong" onClick={() => nav.record(null)}>Добавить первую</button></Empty>
-          ) : (
-            [...recs].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5).map((r) => (
-              <SwipeRow key={r.id} onDelete={() => deleteRecord(nav, r)}><RecordRow r={r} accounts={accounts} onClick={() => nav.record(r)} /></SwipeRow>
-            ))
-          )}
-        </Card>
-
-        <TopExpenses recs={recs} range={month} />
-
-        <Card title="Бюджеты" onMore={() => nav.push(Budgets, { pushed: true })}>
-          <BudgetsPreview budgets={alive(s.ledger.budgets)} recs={recs} />
-        </Card>
-
-        <Card title="Запланированные платежи" onMore={() => nav.push(Scheduled, { pushed: true })}>
-          <ScheduledPreview />
-        </Card>
-      </div>
+        ) },
+        { key: 'templates', node: <QuickTemplates /> },
+        { key: 'cashflow', node: (
+          <Card title="Денежный поток" menu={<Menu items={[['Открыть отчёт', () => nav.push(Reports, { pushed: true })]]} />} onMore={() => nav.push(CashFlowScreen, {})}>
+            <div class="caption">Этот месяц</div>
+            <div class="big-amount num">{rub(t.flow)}</div>
+            <div class="bar-row">
+              <div class="bar-label"><span>Доход</span><span class="num">{rub(t.income)}</span></div>
+              <Bar value={t.income} max={Math.max(t.income, t.expense)} color="var(--pos)" />
+            </div>
+            <div class="bar-row">
+              <div class="bar-label"><span>Расходы</span><span class="num">{rub(t.expense)}</span></div>
+              <Bar value={t.expense} max={Math.max(t.income, t.expense)} color="var(--neg)" />
+            </div>
+          </Card>
+        ) },
+        { key: 'balance', node: (
+          <Card title="Динамика баланса" menu={<Menu items={[['Все счета', () => nav.push(Accounts, { pushed: true })]]} />} onMore={() => nav.push(BalanceScreen, {})}>
+            <div class="caption">Сегодня{s.settings.view !== 'all' ? ` · счета: ${s.settings.view}` : ' · все счета в рублях'}</div>
+            <div class="big-amount num">{rub(totalBalance)}</div>
+            <Area series={series} />
+            <div class="legend"><i /> Баланс всех счетов</div>
+          </Card>
+        ) },
+        { key: 'expenses', node: <ExpensesCard recs={recs} range={month} /> },
+        { key: 'recent', node: (
+          <Card title="Последние записи" menu={<Menu items={[['Все записи', () => nav.push(Records, { pushed: true })]]} />} onMore={() => nav.push(Records, { pushed: true })}>
+            {recs.length === 0 ? (
+              <Empty icon="🧾" text="Записей пока нет"><button class="link strong" onClick={() => nav.record(null)}>Добавить первую</button></Empty>
+            ) : (
+              [...recs].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5).map((r) => (
+                <SwipeRow key={r.id} onDelete={() => deleteRecord(nav, r)}><RecordRow r={r} accounts={accounts} onClick={() => nav.record(r)} /></SwipeRow>
+              ))
+            )}
+          </Card>
+        ) },
+        { key: 'top', node: <TopExpenses recs={recs} range={month} /> },
+        { key: 'budgets', node: (
+          <Card title="Бюджеты" onMore={() => nav.push(Budgets, { pushed: true })}>
+            <BudgetsPreview budgets={alive(s.ledger.budgets)} recs={recs} />
+          </Card>
+        ) },
+        { key: 'scheduled', node: (
+          <Card title="Запланированные платежи" onMore={() => nav.push(Scheduled, { pushed: true })}>
+            <ScheduledPreview />
+          </Card>
+        ) },
+      ].filter(Boolean)} />
+      <div class="muted" style={{ textAlign: 'center', fontSize: 'var(--fs-xs)', padding: '0 var(--s4) var(--s5)' }}>Зажмите виджет и перетащите, чтобы поменять порядок</div>
     </Screen>
   );
 }
@@ -113,7 +116,7 @@ function AccountsGrid({ accounts, records }) {
   const view = s.settings.view;
   const bal = (a) => accountBalance(a, records);
   const rubOf = (items) => items.reduce((x, a) => x + toRub(bal(a), a.currency), 0);
-  const sections = accountSections(accounts, s.settings.me).filter((sec) => view === 'all' || sec.key === view || sec.key === 'shared');
+  const sections = accountSections(accounts, s.settings.me).filter((sec) => view === 'all' || sec.key === view);
   return (
     <>
       {sections.map((sec) => {

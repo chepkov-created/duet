@@ -59,20 +59,35 @@ function ItemsBlock({ items, total, onChange, onUseSum, onPickCat }) {
   const num = (t) => Number(String(t || '').replace(/\s/g, '').replace(',', '.')) || 0;
   const sum = Math.round(items.reduce((a, it) => a + num(it.sum), 0) * 100) / 100;
   const set = (i, patch) => onChange(items.map((it, j) => (j === i ? { ...it, ...patch } : it)));
+  const r2 = (v) => Math.round(v * 100) / 100;
+  const qtyOf = (it) => num(it.qty) || 1;
+  // Price per unit; older items (Ozon, receipts) only have the line total, so derive it.
+  const priceOf = (it) => (it.price !== undefined ? it.price : it.sum === '' || it.sum === undefined ? '' : String(r2(num(it.sum) / qtyOf(it))).replace('.', ','));
+  // The line total is always quantity × price.
+  const setQty = (i, qty) => { const it = items[i]; set(i, { qty, price: priceOf(it), sum: r2((num(qty) || 1) * num(priceOf(it))) }); };
+  const setPrice = (i, price) => set(i, { price, sum: r2(qtyOf(items[i]) * num(price)) });
   return (
     <div class="row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <span class="ri" aria-hidden="true">🧾</span><span class="rl">Позиции чека{items.length ? ` · ${items.length}` : ''}</span>
-        <button class="link" onClick={() => onChange([...items, { name: '', qty: 1, sum: '' }])}>+ позиция</button>
+        <button class="link" onClick={() => onChange([...items, { name: '', qty: 1, price: '', sum: 0 }])}>+ позиция</button>
       </div>
+      {items.length > 0 && (
+        <div class="items-head" aria-hidden="true"><span style={{ flex: 3 }}>Товар</span><span style={{ flex: 1, maxWidth: 48 }}>Кол-во</span><span style={{ flex: 1.4 }}>Цена, ₽</span><span style={{ width: 56 }} /></div>
+      )}
       {items.map((it, i) => (
-        <div key={i} style={{ display: 'flex', gap: 6, paddingLeft: 42 }}>
-          <input style={{ flex: 3, textAlign: 'left' }} placeholder="Товар" aria-label="Товар" value={it.name} onInput={(e) => set(i, { name: e.currentTarget.value })} />
-          <input style={{ flex: 1, maxWidth: 48 }} inputMode="decimal" aria-label="Количество" value={it.qty} onInput={(e) => set(i, { qty: e.currentTarget.value })} />
-          <input style={{ flex: 1.4 }} inputMode="decimal" placeholder="₽" aria-label="Сумма" value={it.sum} onInput={(e) => set(i, { sum: e.currentTarget.value })} />
-          <button class="item-cat" title={it.categoryId ? category(it.categoryId).name : 'Как у записи'} aria-label={`Категория позиции: ${it.categoryId ? category(it.categoryId).name : 'как у записи'}`} onClick={() => onPickCat(i)}
-            style={{ background: it.categoryId ? category(it.categoryId).color : 'var(--surface-3)' }}>{it.categoryId ? category(it.categoryId).icon : '·'}</button>
-          <button class="link" aria-label="Убрать позицию" style={{ color: 'var(--text-3)' }} onClick={() => onChange(items.filter((_, j) => j !== i))}>✕</button>
+        <div key={i} style={{ display: 'grid', gap: 2, paddingLeft: 42 }}>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input style={{ flex: 3, textAlign: 'left' }} placeholder="Товар" aria-label="Товар" value={it.name} onInput={(e) => set(i, { name: e.currentTarget.value })} />
+            <input style={{ flex: 1, maxWidth: 48 }} inputMode="decimal" aria-label="Количество" value={it.qty} onInput={(e) => setQty(i, e.currentTarget.value)} />
+            <input style={{ flex: 1.4 }} inputMode="decimal" placeholder="за шт." aria-label="Цена за штуку" value={priceOf(it)} onInput={(e) => setPrice(i, e.currentTarget.value)} />
+            <button class="item-cat" title={it.categoryId ? category(it.categoryId).name : 'Как у записи'} aria-label={`Категория позиции: ${it.categoryId ? category(it.categoryId).name : 'как у записи'}`} onClick={() => onPickCat(i)}
+              style={{ background: it.categoryId ? category(it.categoryId).color : 'var(--surface-3)' }}>{it.categoryId ? category(it.categoryId).icon : '·'}</button>
+            <button class="link" aria-label="Убрать позицию" style={{ color: 'var(--text-3)' }} onClick={() => onChange(items.filter((_, j) => j !== i))}>✕</button>
+          </div>
+          {qtyOf(it) !== 1 && num(priceOf(it)) > 0 && (
+            <div class="muted" style={{ fontSize: 'var(--fs-xs)', textAlign: 'right', paddingRight: 56 }}>{String(it.qty).replace('.', ',')} × {priceOf(it)} = {r2(num(it.sum)).toLocaleString('ru-RU')} ₽</div>
+          )}
         </div>
       ))}
       {items.length > 0 && Math.abs(sum - total) > 0.009 && (
