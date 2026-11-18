@@ -419,3 +419,27 @@ input, select, textarea { font: inherit; color: inherit; }
 .row input.input-req::placeholder { color: var(--neg-text); opacity: 1; }
 .row select.req { color: var(--neg-text); }
 .row input.input-req.bad { box-shadow: inset 0 -2px 0 var(--neg); }
+/* own calendar (blocks dates the phone's picker can't) */
+.cal { padding: var(--s2) var(--s1); }
+.cal-head { display: flex; align-items: center; gap: var(--s2); padding: 0 var(--s2) var(--s3); }
+.cal-title { flex: 1; font-weight: 600; font-size: var(--fs-l); }
+.cal-arrow { font-size: 30px; line-height: 1; width: 40px; height: 36px; display: grid; place-items: center; }
+.cal-arrow:disabled { color: var(--text-3); }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); row-gap: 4px; text-align: center; }
+.cal-wd { color: var(--text-3); font-size: var(--fs-xs); text-transform: uppercase; font-weight: 600; padding-bottom: 6px; }
+.cal-day { justify-self: center; width: 42px; height: 42px; border-radius: 50%; font-size: var(--fs-l); color: var(--text); font-variant-numeric: tabular-nums; }
+.cal-day.today { color: var(--accent); font-weight: 600; }
+.cal-day.on { background: var(--accent); color: #fff; font-weight: 700; }
+.cal-day:disabled { color: var(--text-3); opacity: 0.45; }
+/* scroll wheels */
+.wheels { position: relative; display: grid; grid-template-columns: 1fr 1.4fr; padding: 0 var(--s4) var(--s3); }
+.wheel-band { position: absolute; left: var(--s3); right: var(--s3); top: 72px; height: 36px; background: var(--surface-2); border-radius: 10px; pointer-events: none; }
+.wheel { position: relative; height: 180px; overflow-y: auto; scroll-snap-type: y mandatory; scrollbar-width: none; -webkit-mask-image: linear-gradient(transparent, #000 30%, #000 70%, transparent); mask-image: linear-gradient(transparent, #000 30%, #000 70%, transparent); }
+.wheel::-webkit-scrollbar { display: none; }
+.wheel-item { height: 36px; line-height: 36px; text-align: center; scroll-snap-align: center; color: var(--text-2); font-size: var(--fs-l); cursor: pointer; }
+.wheel-item.on { color: var(--text); font-size: 22px; }
+/* weekday circles */
+.week-days { justify-content: space-between; }
+.week-days button { width: 40px; height: 40px; border-radius: 50%; font-size: var(--fs-m); color: var(--text); }
+.week-days button.on { background: var(--accent); color: #fff; }
+.pill-btn.on { background: var(--accent); color: #fff; }

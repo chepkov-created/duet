@@ -4,6 +4,7 @@ import { Sheet, Segmented, Row, CatIcon, PERSON_COLOR } from './kit.jsx';
 import { useStore, alive, upsert, remove, undoDelete, updateSettings, otherPerson, PEOPLE, CURRENCIES } from '../data/store.js';
 import { accountSections, accLabel } from './Accounts.jsx';
 import { TemplatePicker } from './Templates.jsx';
+import { DateTimeSheet, dateTimeText } from './DatePick.jsx';
 import { category, allowsItems, EXPENSE_GROUPS, INCOME_GROUPS, NATURES, natureOf } from '../data/categories.js';
 
 /** "2400000,5" -> "2 400 000,5" (narrow no-break spaces between thousands). */
@@ -82,6 +83,7 @@ function ItemsBlock({ items, total, onChange, onUseSum, onPickCat }) {
 }
 import { toLocalInput } from '../data/format.js';
 
+const endOfToday = () => { const d = new Date(); d.setHours(23, 59, 59, 999); return d; };
 export const PAY = ['Наличные', 'Карта', 'Перевод', 'СБП', 'Онлайн'];
 
 // fields a template carries over into a record
@@ -138,6 +140,7 @@ export function RecordForm({ record, defaults, template }) {
     if (!amount) return setError('Введите сумму');
     if (f.type !== 'transfer' && !f.categoryId) return setError('Выберите категорию');
     if (!f.accountId) return setError('Выберите счёт');
+    if (f.date && new Date(f.date) > endOfToday()) return setError('Записать можно только сегодняшним днём или раньше');
     if (f.type === 'transfer' && f.toAccountId === f.accountId) return setError('Выберите разные счета');
     if (exchange && !num(f.toAmountText)) return setError(`Сколько ${CURRENCIES[toCur]} пришло на «${acc(f.toAccountId).name}»?`);
     const { amountText, toAmountText, name, uses, toAmount, ...rest } = f;
@@ -163,6 +166,9 @@ export function RecordForm({ record, defaults, template }) {
     const i = picker;
     return <CategoryPicker type="expense" onClose={() => setPicker(null)}
       onPick={(id) => { upd({ items: (f.items || []).map((it, j) => (j === i ? { ...it, categoryId: id === f.categoryId ? undefined : id } : it)) }); setPicker(null); }} />;
+  }
+  if (picker === 'date') {
+    return <DateTimeSheet value={f.date} onClose={() => setPicker(null)} onDone={(date) => { upd({ date }); setError(''); setPicker(null); }} />;
   }
   if (picker === 'cat') {
     return <CategoryPicker type={f.type} onPick={(id) => { upd({ categoryId: id }); setPicker(null); }} onClose={() => setPicker(null)} />;
@@ -243,9 +249,7 @@ export function RecordForm({ record, defaults, template }) {
             label="Категория" value={c ? c.name : 'Обязательно'} valueClass={c ? '' : 'req'} onClick={() => setPicker('cat')} />
         )}
         {!isTpl && (
-          <label class="row"><span class="ri" aria-hidden="true">📅</span><span class="rl">Дата и время</span>
-            <input type="datetime-local" value={toLocalInput(f.date || new Date().toISOString())} onInput={(e) => e.currentTarget.value && upd({ date: new Date(e.currentTarget.value).toISOString() })} />
-          </label>
+          <Row icon="📅" label="Дата и время" value={dateTimeText(f.date || new Date().toISOString())} onClick={() => setPicker('date')} />
         )}
         <div class="row"><span class="ri" aria-hidden="true">👤</span><span class="rl">Чья запись</span>
           <div class="who">

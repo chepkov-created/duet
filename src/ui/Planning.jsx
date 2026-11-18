@@ -8,6 +8,8 @@ import { category, group, EXPENSE_GROUPS } from '../data/categories.js';
 import { rub, toLocalInput, addMonths, addDays } from '../data/format.js';
 import { periodRange, inRange } from '../data/periods.js';
 import { CategoryPicker, AmountInput, LabelsRow, PAY } from './RecordForm.jsx';
+import { RepeatPicker } from './DatePick.jsx';
+import { repeatText, fullDate } from '../data/repeat.js';
 import { payScheduled, duePayments, myScheduled, Scheduled } from './Payments.jsx';
 
 export function Planning() {
@@ -32,14 +34,7 @@ export function Planning() {
 }
 
 /* ---------- scheduled payments ---------- */
-const REPEAT = [['none', 'Один раз'], ['weekly', 'Каждую неделю'], ['monthly', 'Каждый месяц'], ['yearly', 'Каждый год']];
-export const nextDate = (iso, repeat) => {
-  const d = new Date(iso);
-  if (repeat === 'weekly') return addDays(d, 7).toISOString();
-  if (repeat === 'monthly') return addMonths(d, 1).toISOString();
-  if (repeat === 'yearly') return addMonths(d, 12).toISOString();
-  return null;
-};
+export { nextDate } from '../data/repeat.js';
 
 export { Scheduled };
 
@@ -48,7 +43,7 @@ export function ScheduledForm({ item, onClose }) {
   const accounts = alive(s.ledger.accounts);
   const [f, setF] = useState(item ? { notifyDay: true, notify3: true, confirm: 'manual', payment: 'Карта', labels: [], ...item, amountText: String(item.amount).replace('.', ',') } : {
     name: '', type: 'expense', amountText: '', accountId: '', categoryId: '', owner: s.settings.me,
-    date: '', repeat: 'monthly', confirm: 'manual', payment: 'Карта', payee: '', labels: [], note: '', notifyDay: true, notify3: true,
+    date: '', repeat: 'none', every: 1, weekdays: [], until: '', confirm: 'manual', payment: 'Карта', payee: '', labels: [], note: '', notifyDay: true, notify3: true,
   });
   const [pick, setPick] = useState(null);
   const [tried, setTried] = useState(false);
@@ -62,6 +57,7 @@ export function ScheduledForm({ item, onClose }) {
   const acc = accounts.find((a) => a.id === f.accountId);
   const c = f.categoryId ? category(f.categoryId) : null;
   const req = (ok) => (ok ? '' : 'req');
+  if (pick === 'date') return <RepeatPicker value={f} onClose={() => setPick(null)} onDone={(r) => { upd(r); setPick(null); }} />;
   if (pick === 'cat') return <CategoryPicker type={f.type} onPick={(id) => { upd({ categoryId: id }); setPick(null); }} onClose={() => setPick(null)} />;
   return (
     <Sheet title={item ? 'Платёж' : 'Новый платёж'} onClose={onClose}
@@ -110,14 +106,8 @@ export function ScheduledForm({ item, onClose }) {
 
       <div class="group-label">Дата и повтор</div>
       <div class="list">
-        <label class="row"><span class="ri" aria-hidden="true">📅</span><span class="rl">Дата</span>
-          <input type="date" class={req(f.date)} value={f.date ? toLocalInput(f.date).slice(0, 10) : ''}
-            onInput={(e) => { const v = e.currentTarget.value; if (v) { const d = new Date(`${v}T12:00`); upd({ date: d.toISOString() }); } }} />
-          {!f.date && <span class="rv req" aria-hidden="true" style={{ pointerEvents: 'none' }}>Обязательно</span>}
-        </label>
-        <label class="row"><span class="ri" aria-hidden="true">🔁</span><span class="rl">Повтор</span>
-          <select value={f.repeat} onChange={(e) => upd({ repeat: e.currentTarget.value })}>{REPEAT.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
-        </label>
+        <Row icon="📅" label="Дата" value={f.date ? fullDate(f.date) : 'Обязательно'} valueClass={req(f.date)} onClick={() => setPick('date')} />
+        {f.date && <Row icon="🔁" label="Повтор" value={repeatText(f)} onClick={() => setPick('date')} />}
       </div>
 
       <div class="group-label">Подробнее</div>

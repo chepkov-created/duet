@@ -8,7 +8,9 @@ import { useStore, alive, upsert, remove, getState, updateSettings, accountBalan
 import { category } from '../data/categories.js';
 import { rub, addMonths, dayStart, dayLabel, plural } from '../data/format.js';
 import { usePeriod, PeriodDock } from './Period.jsx';
-import { budgetSpent, Budgets, ScheduledForm, nextDate } from './Planning.jsx';
+import { budgetSpent, Budgets, ScheduledForm } from './Planning.jsx';
+import { nextDate, repeatText } from '../data/repeat.js';
+export { repeatText };
 import { accLabel } from './Accounts.jsx';
 
 const MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
@@ -40,7 +42,7 @@ export function autoPayDue(s = getState()) {
     for (let i = 0; i < 24 && x && daysUntil(x.date) <= 0; i++) {
       payScheduled(x, x.amount, x.date);
       n++;
-      const nd = nextDate(x.date, x.repeat);
+      const nd = nextDate(x.date, x.repeat, x);
       x = nd ? { ...x, date: nd } : null;
     }
   }
@@ -48,7 +50,7 @@ export function autoPayDue(s = getState()) {
 }
 export function skipScheduled(x) { advance({ ...x, skipped: [...(x.skipped || []), x.date] }); }
 function advance(x) {
-  const nd = nextDate(x.date, x.repeat);
+  const nd = nextDate(x.date, x.repeat, x);
   if (nd) upsert('scheduled', { ...x, date: nd }); else remove('scheduled', x.id);
 }
 
@@ -83,16 +85,6 @@ export function Scheduled() {
   );
 }
 
-const WEEKDAYS = ['воскресеньям', 'понедельникам', 'вторникам', 'средам', 'четвергам', 'пятницам', 'субботам'];
-/** "Каждый месяц, 19-го" / "Каждую неделю по средам" / "Каждый год, 19 ноября" / "Один раз" */
-export function repeatText(x) {
-  const d = new Date(x.date);
-  if (x.repeat === 'monthly') return `Каждый месяц, ${d.getDate()}-го`;
-  if (x.repeat === 'weekly') return `Каждую неделю по ${WEEKDAYS[d.getDay()]}`;
-  if (x.repeat === 'yearly') return `Каждый год, ${d.getDate()} ${MONTHS[d.getMonth()]}`;
-  return 'Один раз';
-}
-
 export function PayRow({ x, onClick }) {
   const s = useStore();
   const n = daysUntil(x.date);
@@ -124,7 +116,7 @@ export function PaymentDetail({ id }) {
   const x = alive(s.ledger.scheduled).find((y) => y.id === id);
   if (!x) return <Screen pushed title="Платёж" back="Назад" onBack={nav.pop}><Empty icon="✓" text="Платёж завершён или удалён" /></Screen>;
   const upcoming = [x.date];
-  const nd = nextDate(x.date, x.repeat);
+  const nd = nextDate(x.date, x.repeat, x);
   if (nd) upcoming.push(nd);
   const paid = alive(s.ledger.records).filter((r) => r.scheduledId === id).map((r) => ({ kind: 'paid', date: r.dueDate || r.date, at: r.date, amount: r.amount, rid: r.id }));
   const skipped = (x.skipped || []).map((d) => ({ kind: 'skip', date: d }));
@@ -246,7 +238,7 @@ export function occurrences(list, from, to) {
     let d = x.date;
     for (let i = 0; d && new Date(d) <= to && i < 400; i++) {
       if (new Date(d) >= from) out.push({ ...x, date: d });
-      d = nextDate(d, x.repeat);
+      d = nextDate(d, x.repeat, x);
     }
   }
   return out;
