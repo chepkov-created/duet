@@ -405,3 +405,9 @@ input, select, textarea { font: inherit; color: inherit; }
 .swipe-row .rec + .rec, .swipe-row + .swipe-row .rec { border-top: 0; }
 .swipe-del { position: absolute; top: 0; right: 0; bottom: 0; width: 88px; background: var(--neg); color: #fff; font-weight: 600; font-size: var(--fs-s); }
 .swipe-front { position: relative; background: var(--surface); touch-action: pan-y; }
+
+/* carousel */
+.carousel { overflow: hidden; touch-action: pan-y; width: 100%; }
+.carousel-track { display: flex; will-change: transform; }
+.carousel-page { flex: 0 0 100%; min-width: 0; }
+.period-dock .carousel-page { padding: 0 1px; }

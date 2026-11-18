@@ -2,7 +2,7 @@
 import { useState } from 'preact/hooks';
 import { useNav } from './App.jsx';
 import { Screen, Segmented, Card, PERSON_COLOR } from './kit.jsx';
-import { PieDonut, DayBars, Lines, Pager, dayBuckets } from './viz.jsx';
+import { PieDonut, DayBars, Lines, Carousel, dayBuckets } from './viz.jsx';
 import { useStore, alive, visibleRecords, visibleAccounts, accountBalance, toRub, CURRENCIES } from '../data/store.js';
 import { totals, inRange, splitByItems, change } from '../data/periods.js';
 import { GROUPS, group, category, natureOf, NATURES, NATURE_NAME, NATURE_COLOR } from '../data/categories.js';
@@ -93,11 +93,10 @@ export function ExpenseExplorer({ full }) {
     <>
       <Segmented options={[['cats', 'Категории'], ['labels', 'Метки и люди']]} value={mode} onChange={(m) => { setMode(m); setSelTop(null); setSelSub(null); setPage(0); }} />
       <div class="caption" style={{ margin: 'var(--s4) 0 var(--s2)' }}>{range.label}</div>
-      <Pager page={pg} count={levels} onChange={setPage}>
-        {pg === 0
-          ? <PieDonut parts={top.parts} selected={selTop} onSelect={(k) => { setSelTop(k); setSelSub(null); }} onOpen={open} />
-          : <PieDonut parts={drill.parts} selected={selSub} onSelect={setSelSub} totalLabel={group(selTop)?.name} />}
-      </Pager>
+      <Carousel page={pg} onChange={setPage} dotLabel="Уровень" pages={[
+        <PieDonut key="top" parts={top.parts} selected={selTop} onSelect={(k) => { setSelTop(k); setSelSub(null); }} onOpen={open} />,
+        ...(drill ? [<PieDonut key="sub" parts={drill.parts} selected={selSub} onSelect={setSelSub} totalLabel={group(selTop)?.name} />] : []),
+      ]} />
       <div class="muted" style={{ textAlign: 'center', fontSize: 'var(--fs-xs)', marginTop: 4 }}>
         {pg === 0 ? (mode === 'cats' ? 'Нажмите на часть круга, ещё раз — подкатегории' : 'Нажмите на часть круга') : 'Смахните вправо, чтобы вернуться'}
       </div>

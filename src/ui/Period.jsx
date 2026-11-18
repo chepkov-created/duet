@@ -1,4 +1,5 @@
-import { useRef, useState } from 'preact/hooks';
+import { useState } from 'preact/hooks';
+import { Carousel } from './viz.jsx';
 import { Sheet, Row } from './kit.jsx';
 import { useStore, updateSettings, alive, filterCount } from '../data/store.js';
 import { FilterSheet } from './Filter.jsx';
@@ -30,35 +31,20 @@ export function PeriodDock({ bottom = 'calc(var(--tabbar-h) + var(--safe-b))' })
   const catValue = [f.type === 'income' ? 'Доходы' : f.type === 'expense' ? 'Расходы' : '', f.cats?.length ? `${f.cats.length} кат.` : '', f.labels?.length ? `${f.labels.length} мет.` : '', f.natures?.length ? `${f.natures.length} хар.` : ''].filter(Boolean).join(' · ') || 'Все';
   const active = filterCount(f);
 
-  // Swipe left/right on the panel switches the three pages; drag the handle up/down to open/close.
-  const touch = useRef(null);
-  const onStart = (e) => { const t = e.touches[0]; touch.current = { x: t.clientX, y: t.clientY }; };
-  const onEnd = (e) => {
-    if (!touch.current) return;
-    const t = e.changedTouches[0];
-    const dx = t.clientX - touch.current.x, dy = t.clientY - touch.current.y;
-    touch.current = null;
-    if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.5) setPage((pg) => Math.max(0, Math.min(2, pg + (dx < 0 ? 1 : -1))));
-  };
   return (
-    <div class={`period-dock${open ? ' open' : ''}`} style={{ bottom }} onTouchStart={onStart} onTouchEnd={onEnd}>
-
-      {page === 0 && (
-        <div class="seg" role="tablist" aria-label="Период">
+    <div class={`period-dock${open ? ' open' : ''}`} style={{ bottom }}>
+      <Carousel page={page} onChange={setPage} dots={false} pages={[
+        <div key="rolling" class="seg" role="tablist" aria-label="Период">
           {ROLLING.map(([k, l]) => (
             <button key={k} class={p.kind === 'rolling' && p.key === k ? 'on' : ''} onClick={() => setP({ kind: 'rolling', key: k })}>{l}</button>
           ))}
-        </div>
-      )}
-      {page === 1 && (
-        <div class="stepper">
+        </div>,
+        <div key="cal" class="stepper">
           <button aria-label="Предыдущий период" onClick={() => setP({ ...(p.kind === 'cal' ? p : DEFAULT), offset: ((p.kind === 'cal' && p.offset) || 0) - 1 })}>‹</button>
           <button class="mid" onClick={() => setUnits(true)}>{p.kind === 'cal' ? range.label : 'Выбрать период'} ▾</button>
           <button aria-label="Следующий период" disabled={p.kind === 'cal' && p.offset >= 0} onClick={() => setP({ ...(p.kind === 'cal' ? p : DEFAULT), offset: Math.min(0, ((p.kind === 'cal' && p.offset) || 0) + 1) })}>›</button>
-        </div>
-      )}
-      {page === 2 && (
-        <div class="range">
+        </div>,
+        <div key="range" class="range">
           <label class="sr-only" for="pf">С</label>
           <input id="pf" type="date" value={dateVal(p.kind === 'range' ? p.from : addDays(new Date(), -6))} max={dateVal(new Date())}
             onInput={(e) => e.currentTarget.value && setP({ kind: 'range', from: new Date(e.currentTarget.value).toISOString(), to: p.kind === 'range' ? p.to : dayStart(new Date()).toISOString() })} />
@@ -67,7 +53,7 @@ export function PeriodDock({ bottom = 'calc(var(--tabbar-h) + var(--safe-b))' })
           <input id="pt" type="date" value={dateVal(p.kind === 'range' ? p.to : new Date())}
             onInput={(e) => e.currentTarget.value && setP({ kind: 'range', from: p.kind === 'range' ? p.from : addDays(new Date(), -6).toISOString(), to: new Date(e.currentTarget.value).toISOString() })} />
         </div>
-      )}
+      ]} />
       <div class="dock-foot">
         <span />
         <div class="pager" role="tablist" aria-label="Способ выбора периода">

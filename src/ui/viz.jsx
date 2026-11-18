@@ -1,5 +1,5 @@
 // Interactive charts: a donut you can tap and drill into, bars by day, comparison lines.
-import { useRef, useState } from 'preact/hooks';
+import { useRef, useState, useLayoutEffect, useEffect } from 'preact/hooks';
 import { shortK, ddmm, rub, addDays, dayStart } from '../data/format.js';
 
 /* ---------- donut ---------- */
@@ -146,16 +146,59 @@ export function Lines({ series, height = 200 }) {
   );
 }
 
-/** Horizontal swipe between pages (used for donut levels). */
-export function Pager({ page, count, onChange, children }) {
-  const t = useRef(null);
+/**
+ * Real carousel: all pages sit side by side and the strip follows the finger.
+ * Released past ~20 % of the width (or flicked) it glides to the next page, otherwise springs back.
+ * Edges resist like iOS.
+ */
+export function Carousel({ page, onChange, pages, dots = true, dotLabel = 'Страница' }) {
+  const wrap = useRef(null);
+  const track = useRef(null);
+  const st = useRef(null);
+  const n = pages.length;
+  const place = (dx, anim) => {
+    const el = track.current; if (!el) return;
+    el.style.transition = anim ? 'transform 0.32s cubic-bezier(0.22, 0.8, 0.25, 1)' : 'none';
+    el.style.transform = `translate3d(calc(${-page * 100}% + ${dx}px), 0, 0)`;
+  };
+  useLayoutEffect(() => { place(0, true); }, [page, n]);
+  const ts = (e) => { const t = e.touches[0]; if (t.clientX < 28) return; // the left edge belongs to «back»
+    st.current = { x: t.clientX, y: t.clientY, t: Date.now(), dx: 0, h: null }; };
+  const tm = (e) => {
+    const s = st.current; if (!s) return;
+    const t = e.touches[0]; const dx = t.clientX - s.x, dy = t.clientY - s.y;
+    if (s.h === null && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) s.h = Math.abs(dx) > Math.abs(dy);
+    if (!s.h) return;
+    e.stopPropagation();
+    if (e.cancelable) e.preventDefault();
+    const edge = (page === 0 && dx > 0) || (page === n - 1 && dx < 0);
+    s.dx = edge ? dx / 3 : dx; // rubber band at the ends
+    place(s.dx, false);
+  };
+  const te = () => {
+    const s = st.current; st.current = null; if (!s || !s.h) return;
+    const w = wrap.current?.clientWidth || 300;
+    const v = Math.abs(s.dx) / Math.max(1, Date.now() - s.t); // px per ms
+    let next = page;
+    if (Math.abs(s.dx) > w * 0.2 || (v > 0.45 && Math.abs(s.dx) > 20)) next = Math.max(0, Math.min(n - 1, page + (s.dx < 0 ? 1 : -1)));
+    if (next !== page) onChange(next); else place(0, true);
+  };
+  // touchmove must be non-passive to stop the page from scrolling sideways
+  useEffect(() => {
+    const el = wrap.current; if (!el) return;
+    el.addEventListener('touchmove', tm, { passive: false });
+    return () => el.removeEventListener('touchmove', tm);
+  });
   return (
-    <div onTouchStart={(e) => { t.current = e.touches[0].clientX; }}
-      onTouchEnd={(e) => { if (t.current == null) return; const dx = e.changedTouches[0].clientX - t.current; t.current = null; if (Math.abs(dx) > 50) onChange(Math.max(0, Math.min(count - 1, page + (dx < 0 ? 1 : -1)))); }}>
-      {children}
-      {count > 1 && (
+    <div>
+      <div ref={wrap} class="carousel" onTouchStart={ts} onTouchEnd={te} onTouchCancel={te}>
+        <div ref={track} class="carousel-track">
+          {pages.map((pg, i) => <div key={i} class="carousel-page" aria-hidden={i !== page}>{pg}</div>)}
+        </div>
+      </div>
+      {dots && n > 1 && (
         <div class="pager" style={{ justifyContent: 'center', display: 'flex' }}>
-          {Array.from({ length: count }, (_, i) => <button key={i} aria-label={`Уровень ${i + 1}`} class={page === i ? 'on' : ''} onClick={() => onChange(i)}><i /></button>)}
+          {pages.map((_, i) => <button key={i} aria-label={`${dotLabel} ${i + 1}`} class={page === i ? 'on' : ''} onClick={() => onChange(i)}><i /></button>)}
         </div>
       )}
     </div>
