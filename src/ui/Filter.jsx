@@ -1,10 +1,12 @@
 import { useState } from 'preact/hooks';
 import { Sheet, CatIcon, Segmented, PERSON_COLOR } from './kit.jsx';
-import { useStore, alive, updateSettings, filterCount, allLabels, EMPTY_FILTER, PEOPLE } from '../data/store.js';
+import { useStore, alive, updateSettings, filterCount, allLabels, EMPTY_FILTER, PEOPLE, CURRENCIES } from '../data/store.js';
 import { GROUPS, category, group, NATURES, NATURE_NAME } from '../data/categories.js';
 import { accLabel, accountSections } from './Accounts.jsx';
 
 const toggle = (list, v) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
+const TYPE_NAME = { expense: 'Только расходы', income: 'Только доходы', transfer: 'Только переводы' };
+const RESET_ONE = { type: 'all', transfers: 'with', status: 'all' };
 
 export function FilterButton() {
   const s = useStore();
@@ -29,7 +31,10 @@ export function FilterBar() {
   if (!filterCount(f)) return null;
   const accounts = alive(s.ledger.accounts);
   const chips = [
-    ...(f.type && f.type !== 'all' ? [['type', f.type, f.type === 'income' ? 'Только доходы' : 'Только расходы']] : []),
+    ...(f.type && f.type !== 'all' ? [['type', f.type, TYPE_NAME[f.type]]] : []),
+    ...(f.transfers === 'without' ? [['transfers', 'without', 'Без переводов']] : []),
+    ...(f.status && f.status !== 'all' ? [['status', f.status, f.status === 'done' ? 'Проведённые' : 'Ожидаемые']] : []),
+    ...(f.currencies || []).map((c) => ['currencies', c, `Валюта ${CURRENCIES[c] || c}`]),
     ...(f.natures || []).map((k) => ['natures', k, NATURE_NAME[k]]),
     ...f.accounts.map((id) => ['accounts', id, accLabel(accounts.find((a) => a.id === id))]),
     ...f.cats.map((id) => ['cats', id, id.includes('.') ? category(id).name : group(id)?.name]),
@@ -40,7 +45,7 @@ export function FilterBar() {
       <button class="label-chip" onClick={() => setOpen(true)}>Фильтр:</button>
       {chips.map(([k, v, label]) => (
         <button key={k + v} class="label-chip on" aria-label={`Убрать: ${label}`}
-          onClick={() => updateSettings({ filter: { ...f, [k]: k === 'type' ? 'all' : f[k].filter((x) => x !== v) } })}>{label} ✕</button>
+          onClick={() => updateSettings({ filter: { ...f, [k]: RESET_ONE[k] ?? f[k].filter((x) => x !== v) } })}>{label} ✕</button>
       ))}
       <button class="label-chip" style={{ color: 'var(--neg-text)' }} onClick={() => updateSettings({ filter: EMPTY_FILTER })}>Сбросить</button>
       {open && <FilterSheet onClose={() => setOpen(false)} />}
@@ -60,10 +65,11 @@ export function FilterSheet({ onClose, section = 'all' }) {
   const n = filterCount(f);
   const showAcc = section !== 'cats', showCats = section !== 'accounts', showWho = section === 'all';
   const type = f.type || 'all';
-  const groups = GROUPS.filter((g) => type === 'all' || g.type === type);
+  const groups = type === 'transfer' ? [] : GROUPS.filter((g) => type === 'all' || g.type === type);
+  const currencies = [...new Set(['RUB', ...accounts.map((a) => a.currency || 'RUB')])];
   const reset = () => {
     if (section === 'accounts') setF({ ...f, accounts: [] });
-    else if (section === 'cats') setF({ ...f, cats: [], labels: [], type: 'all', natures: [] });
+    else if (section === 'cats') setF({ ...f, cats: [], labels: [], type: 'all', natures: [], transfers: 'with' });
     else { setF(EMPTY_FILTER); setView('all'); }
   };
 
@@ -78,6 +84,20 @@ export function FilterSheet({ onClose, section = 'all' }) {
           <button class={view === 'all' ? 'on' : ''} onClick={() => setView('all')}>Оба</button>
           {PEOPLE.map((p) => <button key={p} class={view === p ? 'on' : ''} onClick={() => setView(p)}><span style={{ color: PERSON_COLOR[p] }}>●</span> {p}</button>)}
         </div>
+      </div>
+      </>}
+
+      {showWho && <>
+      <div class="group-label">Подтверждение записи</div>
+      <div style={{ padding: '0 var(--s4)' }}>
+        <Segmented options={[['all', 'Все'], ['done', 'Проведённые'], ['planned', 'Ожидаемые']]} value={f.status || 'all'} onChange={(status) => setF({ ...f, status })} />
+      </div>
+      <div class="group-label">Валюты {f.currencies?.length ? `· ${f.currencies.length}` : '· все'}</div>
+      <div style={{ padding: '0 var(--s4)' }}>
+        {currencies.map((c) => {
+          const on = (f.currencies || []).includes(c);
+          return <button key={c} class={`label-chip${on ? ' on' : ''}`} onClick={() => setF({ ...f, currencies: toggle(f.currencies || [], c) })}>{CURRENCIES[c] || c} {c}</button>;
+        })}
       </div>
       </>}
 
@@ -105,10 +125,16 @@ export function FilterSheet({ onClose, section = 'all' }) {
       {showCats && <>
       <div class="group-label">Что показывать</div>
       <div style={{ padding: '0 var(--s4)' }}>
-        <Segmented options={[['all', 'Всё'], ['expense', 'Только расходы'], ['income', 'Только доходы']]} value={type}
-          onChange={(t) => setF({ ...f, type: t, cats: f.cats.filter((c) => t === 'all' || (group(c.split('.')[0])?.type === t)) })} />
+        <Segmented options={[['all', 'Всё'], ['expense', 'Расходы'], ['income', 'Доходы'], ['transfer', 'Переводы']]} value={type}
+          onChange={(t) => setF({ ...f, type: t, transfers: t === 'transfer' ? 'with' : f.transfers, cats: t === 'transfer' ? [] : f.cats.filter((c) => t === 'all' || (group(c.split('.')[0])?.type === t)) })} />
       </div>
-      {type !== 'income' && <>
+      {type === 'all' && <>
+        <div class="group-label">Переводы между счетами</div>
+        <div style={{ padding: '0 var(--s4)' }}>
+          <Segmented options={[['with', 'С переводами'], ['without', 'Без переводов']]} value={f.transfers || 'with'} onChange={(transfers) => setF({ ...f, transfers })} />
+        </div>
+      </>}
+      {(type === 'all' || type === 'expense') && <>
         <div class="group-label">Характер расходов</div>
         <div style={{ padding: '0 var(--s4)' }}>
           {NATURES.map(([k, n, c]) => {
@@ -117,7 +143,7 @@ export function FilterSheet({ onClose, section = 'all' }) {
           })}
         </div>
       </>}
-      <div class="group-label">Категории {f.cats.length ? `· ${f.cats.length}` : '· все'}</div>
+      {type !== 'transfer' && <div class="group-label">Категории {f.cats.length ? `· ${f.cats.length}` : '· все'}</div>}
       <div class="list">
         {groups.map((g) => {
           const groupOn = f.cats.includes(g.id);

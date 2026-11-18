@@ -226,13 +226,19 @@ export async function syncNow() {
 }
 
 /* ---------- derived ---------- */
-export const EMPTY_FILTER = { accounts: [], cats: [], labels: [], type: 'all', natures: [] }; // type: all | expense | income
-export const filterCount = (f = state.settings.filter) => (f?.accounts?.length || 0) + (f?.cats?.length || 0) + (f?.labels?.length || 0) + (f?.type && f.type !== 'all' ? 1 : 0) + (f?.natures?.length || 0);
+// type: all | expense | income | transfer; transfers: with | without; status: all | done | planned; currencies: ['RUB', 'USD', …]
+export const EMPTY_FILTER = { accounts: [], cats: [], labels: [], type: 'all', natures: [], transfers: 'with', status: 'all', currencies: [] };
+export const filterCount = (f = state.settings.filter) => (f?.accounts?.length || 0) + (f?.cats?.length || 0) + (f?.labels?.length || 0) + (f?.type && f.type !== 'all' ? 1 : 0) + (f?.natures?.length || 0)
+  + (f?.transfers === 'without' ? 1 : 0) + (f?.status && f.status !== 'all' ? 1 : 0) + (f?.currencies?.length || 0);
 
 /** Record passes the analytics filter: accounts, categories (group id or sub id), labels. */
 export function matchFilter(r, f) {
   if (!f) return true;
   if (f.type && f.type !== 'all' && r.type !== f.type) return false;
+  if (f.transfers === 'without' && r.type === 'transfer') return false;
+  if (f.status === 'done' && r.status === 'planned') return false;
+  if (f.status === 'planned' && r.status !== 'planned') return false;
+  if (f.currencies?.length && !f.currencies.includes(accCurrency(r.accountId)) && !(r.toAccountId && f.currencies.includes(accCurrency(r.toAccountId)))) return false;
   if (f.natures?.length && !f.natures.includes(natureOfRecord(r))) return false;
   if (f.accounts?.length && !f.accounts.includes(r.accountId) && !f.accounts.includes(r.toAccountId)) return false;
   if (f.cats?.length) {
@@ -264,7 +270,10 @@ export const visibleRecords = (s = state, { ignoreFilter = false } = {}) => {
 /** Accounts shown for the current person view: own ones, plus shared when showing everyone. */
 export const visibleAccounts = (s = state) => {
   const accs = live(s.ledger.accounts);
-  return s.settings.view === 'all' ? accs : accs.filter((a) => a.owner === s.settings.view);
+  const f = s.settings.filter || {};
+  return accs.filter((a) => (s.settings.view === 'all' || a.owner === s.settings.view)
+    && (!f.accounts?.length || f.accounts.includes(a.id))
+    && (!f.currencies?.length || f.currencies.includes(a.currency || 'RUB')));
 };
 
 export const allLabels = (s = state) => [...new Set(live(s.ledger.records).flatMap((r) => r.labels || []))].sort();
