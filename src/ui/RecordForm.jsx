@@ -129,6 +129,7 @@ export function RecordForm({ record, defaults, template }) {
     amountText: defaults?.amount ? numText(defaults.amount) : '',
   });
   const [picker, setPicker] = useState(null); // 'cat' | 'acc' | 'to'
+  const [openSecs, setOpenSecs] = useState(null); // account picker: unfolded sections of the other person / shared
   const [error, setError] = useState('');
   const upd = (patch) => setF((x) => ({ ...x, ...patch }));
   const num = (t) => Number(String(t || '').replace(/\s/g, '').replace(',', '.')) || 0;
@@ -209,20 +210,31 @@ export function RecordForm({ record, defaults, template }) {
     return <CategoryPicker type={f.type} onPick={(id) => { upd({ categoryId: id }); setPicker(null); }} onClose={() => setPicker(null)} />;
   }
   if (picker === 'acc' || picker === 'to') {
+    const chosen = picker === 'acc' ? f.accountId : f.toAccountId;
     return (
       <Sheet title="Счёт" onClose={() => setPicker(null)} left={<button class="link" onClick={() => setPicker(null)}>Назад</button>}>
-        {accountSections(accounts, s.settings.me).map((sec) => (
+        {accountSections(accounts, s.settings.me).map((sec) => {
+          // Your own cards are open; the other person's and shared ones fold away (open if the chosen card is there).
+          const opened = openSecs ?? accountSections(accounts, s.settings.me).filter((x) => x.items.some((a) => a.id === chosen)).map((x) => x.key);
+          const open = sec.key === s.settings.me || opened.includes(sec.key);
+          return (
           <div key={sec.key}>
-            <div class="group-label"><span style={{ color: sec.color }}>●</span> {sec.title}</div>
-            <div class="list option-list">
+            <button class="group-label sec-toggle" aria-expanded={open} onClick={() => setOpenSecs(open ? opened.filter((k) => k !== sec.key) : [...opened, sec.key])}
+              disabled={sec.key === s.settings.me}>
+              <span style={{ color: sec.color }}>●</span> {sec.title}
+              {sec.key !== s.settings.me && !open && <span class="sec-count">{sec.items.length}</span>}
+              {sec.key !== s.settings.me && <span class="sec-caret" aria-hidden="true">{open ? '▾' : '▸'}</span>}
+            </button>
+            {open && <div class="list option-list">
               {sec.items.map((a) => (
                 <Row key={a.id} icon={<span class="dot" style={{ background: a.color, width: 18, height: 18 }} />} label={a.name} chevron={false}
                   value={(picker === 'acc' ? f.accountId : f.toAccountId) === a.id ? '✓' : a.currency !== 'RUB' ? CURRENCIES[a.currency] : ''}
                   onClick={() => { picker === 'acc' ? pickAccount(a.id) : upd({ toAccountId: a.id }); setPicker(null); }} />
               ))}
-            </div>
+            </div>}
           </div>
-        ))}
+          );
+        })}
       </Sheet>
     );
   }

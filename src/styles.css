@@ -465,3 +465,9 @@ input, select, textarea { font: inherit; color: inherit; }
 .sortable.sorting .sort-item.lifted { transition: none; z-index: 20; filter: drop-shadow(0 12px 28px rgba(0, 0, 0, 0.55)); opacity: 0.96; }
 .sortable input, .sortable textarea { -webkit-user-select: text; user-select: text; }
 .items-head { display: flex; gap: 6px; padding-left: 42px; color: var(--text-3); font-size: var(--fs-xs); }
+/* account picker: the other person's and shared accounts fold away */
+.sec-toggle { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; }
+.sec-toggle:disabled { opacity: 1; cursor: default; }
+.sec-caret { margin-left: auto; font-size: var(--fs-l); color: var(--text-2); }
+.sec-count { margin-left: auto; background: var(--surface-2); color: var(--text-2); border-radius: var(--r-pill); padding: 1px 8px; font-size: var(--fs-xs); }
+.sec-count + .sec-caret { margin-left: 8px; }
